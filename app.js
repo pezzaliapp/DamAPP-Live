@@ -2,7 +2,7 @@
  * Riferimenti Firebase & Variabili
  ***************************************/
 let nickname = '';
-let playerColor = ''; // 'red' oppure 'panna'
+let playerColor = ''; // verrà "red" oppure "panna"
 let currentGameId = '';
 let userRef = null;
 
@@ -95,7 +95,7 @@ function sendChallenge(targetId) {
 }
 
 /****************************************************************
- * 4) Ricezione sfide: ascolta cambiamenti per "invite"
+ * 4) Ascolta le modifiche (inviti) per ricevere sfide
  ****************************************************************/
 usersRef.on("child_changed", (snapshot) => {
   const data = snapshot.val();
@@ -117,7 +117,7 @@ usersRef.on("child_changed", (snapshot) => {
 
 /*************************************************
  * 5) startGameWith: crea la partita su Firebase
- *    Assegna: Challenger (inviante) = RED, chi accetta = PANNA
+ *    Assegna: challenger (inviante) = RED, chi accetta = PANNA
  *************************************************/
 function startGameWith(opponentId, selfId) {
   const gameId = Math.random().toString(36).substr(2, 5);
@@ -135,7 +135,7 @@ function startGameWith(opponentId, selfId) {
     }
   });
 
-  // Rimuove inviti e assegna la partita a entrambi
+  // Rimuovo inviti e assegno la partita a entrambi
   usersRef.child(selfId).child("invite").remove();
   usersRef.child(opponentId).child("invite").remove();
   usersRef.child(selfId).update({ currentGame: gameId });
@@ -147,9 +147,6 @@ function startGameWith(opponentId, selfId) {
 
 /*******************************************************
  * 6) Creazione damiera iniziale (8x8)
- * In questa versione:
- * • Le tre righe superiori contengono pedine "panna"
- * • Le tre righe inferiori contengono pedine "red"
  *******************************************************/
 function createInitialBoard() {
   // Valori possibili: "", "red", "panna", "redK", "pannaK"
@@ -157,9 +154,12 @@ function createInitialBoard() {
   for (let r = 0; r < 8; r++) {
     const row = [];
     for (let c = 0; c < 8; c++) {
+      // Le tre righe superiori contengono le pedine "panna"
       if ((r + c) % 2 === 1 && r < 3) {
         row.push('panna');
-      } else if ((r + c) % 2 === 1 && r > 4) {
+      }
+      // Le tre righe inferiori contengono le pedine "red"
+      else if ((r + c) % 2 === 1 && r > 4) {
         row.push('red');
       } else {
         row.push('');
@@ -178,7 +178,7 @@ function listenToGame(gameId) {
   ref.on('value', (snapshot) => {
     const data = snapshot.val();
     if (data && data.board) {
-      // Assegna il colore locale in base al record della partita
+      // Determina il colore locale confrontando con il record della partita
       if (data.players.red === userRef.key) {
         playerColor = 'red';
       } else if (data.players.panna === userRef.key) {
@@ -191,27 +191,31 @@ function listenToGame(gameId) {
 }
 
 /**************************************************************
- * 8) renderBoard: disegna la damiera e gestisce l'orientamento
- * Se sei "panna", inverto l'ordine delle righe
+ * 8) renderBoard: disegna la damiera e inverte le righe per "panna"
  **************************************************************/
 function renderBoard(board, turn) {
   console.log(`renderBoard: Turno di ${turn}. Io sono ${playerColor}`);
   const container = document.getElementById('board');
   container.innerHTML = '';
 
+  // Aggiorna lo status con il turno corrente
   if (turn) {
     document.getElementById('status').textContent = `Turno di ${turn.toUpperCase()}`;
   }
   
-  // Calcola l'ordine delle righe: se sei "panna", le righe vengono invertite
+  // Se il giocatore è "panna", inverto l'ordine delle righe
   let rowIndices = [];
   if (playerColor === 'panna') {
-    for (let r = board.length - 1; r >= 0; r--) { rowIndices.push(r); }
+    for (let r = board.length - 1; r >= 0; r--) {
+      rowIndices.push(r);
+    }
   } else {
-    for (let r = 0; r < board.length; r++) { rowIndices.push(r); }
+    for (let r = 0; r < board.length; r++) {
+      rowIndices.push(r);
+    }
   }
   
-  // Disegna le celle mantenendo le coordinate interne inalterate
+  // Disegna le righe secondo l'orientamento calcolato
   rowIndices.forEach(r => {
     for (let c = 0; c < board[r].length; c++) {
       const square = document.createElement('div');
@@ -224,10 +228,11 @@ function renderBoard(board, turn) {
       const pieceVal = board[r][c];
       if (pieceVal) {
         const piece = document.createElement('div');
-        piece.className = 'piece ' + pieceVal;
+        piece.className = 'piece ' + pieceVal;  // Ci aspettiamo "red", "panna", "redK", "pannaK"
         square.appendChild(piece);
       }
       
+      // Associamo l'evento click mantenendo le coordinate interne
       square.onclick = () => onSquareClick(board, turn, r, c);
       container.appendChild(square);
     }
@@ -244,121 +249,90 @@ function onSquareClick(board, turn, r, c) {
     return;
   }
   
-  // Calcola tutte le catture disponibili per il colore in gioco
-  const availableCaptures = findAllCaptures(board, turn);
-  
-  // Se non ho una pedina selezionata, provo a selezionarla
   if (!selectedCell) {
     const pieceVal = board[r][c];
     if (pieceVal && pieceVal.startsWith(turn)) {
-      // Se esistono catture disponibili e questa pedina non le può fare, non la seleziono
-      if (availableCaptures.length > 0) {
-        const pcapt = availableCaptures.filter(cap => cap.fromR === r && cap.fromC === c);
-        if (pcapt.length === 0) {
-          console.log("Devi catturare, questa pedina non può");
-          return;
-        }
-      }
       selectedCell = { r, c };
-      console.log(`Pedina in (${r},${c}) selezionata`);
+      console.log(`Selezionata pedina in (${r},${c})`);
       renderBoard(board, turn);
     } else {
-      console.log("Cella vuota o non è una mia pedina");
+      console.log("Cella vuota o non è la mia pedina");
     }
   } else {
-    // Ho già una pedina selezionata; controllo se la mossa è cattura (se obbligatoria)
     const fromR = selectedCell.r;
     const fromC = selectedCell.c;
-    const currentPiece = board[fromR][fromC];
-    const isCaptureMove = isThisMoveACapture(board, currentPiece, fromR, fromC, r, c);
-    if (availableCaptures.length > 0 && !isCaptureMove) {
-      console.log("Mossa rifiutata: devi catturare");
-      return;
-    }
     const moveResult = tryMove(board, fromR, fromC, r, c);
     if (!moveResult.success) {
       console.log("Mossa rifiutata:", moveResult.reason);
       return;
     }
-    
-    // Se la mossa è una cattura, controlla se sono disponibili ulteriori catture per lo stesso pezzo
-    if (isCaptureMove) {
-      const moreCaptures = findCapturesForPiece(board, r, c);
-      if (moreCaptures.length > 0) {
-        // Cattura multipla obbligatoria: non cambio turno
-        selectedCell = { r, c };
-        updateBoardOnFirebase(board, turn, true);
-        renderBoard(board, turn);
-        console.log("Cattura multipla: continua a catturare");
-        return;
-      }
-    }
-    
     selectedCell = null;
     updateBoardOnFirebase(board, turn);
   }
 }
 
 /********************************************************************
- * 10) tryMove: controlla se la mossa (passo o cattura) è valida e aggiorna la board
+ * 10) tryMove: controlla se la mossa è valida (passo o cattura)
  ********************************************************************/
 function tryMove(board, fromR, fromC, toR, toC) {
   if (board[toR][toC] !== '') {
     return { success: false, reason: "La destinazione non è vuota" };
   }
-  
+
   const pieceVal = board[fromR][fromC];
   if (!pieceVal) return { success: false, reason: "Nessuna pedina da muovere" };
-  
+
   const dr = toR - fromR;
   const dc = toC - fromC;
   const isRed = pieceVal.startsWith('red');
   const isKing = pieceVal.endsWith('K');
-  
-  // Mossa semplice: 1 casella diagonale
+
+  // Mossa semplice: 1 casella in diagonale
   if (Math.abs(dr) === 1 && Math.abs(dc) === 1) {
-    // Movimento semplice per una pedina non re: deve essere in avanti
     if (!isKing) {
       if (isRed && dr !== -1)
-        return { success: false, reason: "La pedina red si muove solo in su" };
+        return { success: false, reason: "La pedina rossa si muove solo in su di 1" };
       if (!isRed && dr !== 1)
-        return { success: false, reason: "La pedina panna si muove solo in giù" };
+        return { success: false, reason: "La pedina panna si muove solo in giù di 1" };
     }
     board[toR][toC] = pieceVal;
     board[fromR][fromC] = '';
     doPromotionIfNeeded(board, toR, toC);
     return { success: true };
   }
-  
+
   // Cattura: 2 caselle in diagonale
   if (Math.abs(dr) === 2 && Math.abs(dc) === 2) {
-    const midR = fromR + dr/2;
-    const midC = fromC + dc/2;
+    const midR = fromR + dr / 2;
+    const midC = fromC + dc / 2;
     const enemyPiece = board[midR][midC];
     if (!enemyPiece)
-      return { success: false, reason: "Nessun nemico da catturare" };
-    // Controlla che il nemico non sia dello stesso colore
+      return { success: false, reason: "Non c'è un nemico da catturare" };
     if (enemyPiece.startsWith(pieceVal.startsWith('red') ? 'red' : 'panna'))
-      return { success: false, reason: "Non puoi catturare una tua pedina" };
-    // Per la cattura, anche una pedina non re può andare in qualsiasi direzione (backward compreso)
+      return { success: false, reason: "Non posso catturare una mia pedina" };
+    if (!isKing) {
+      if (isRed && dr !== -2)
+        return { success: false, reason: "La pedina rossa cattura solo in su" };
+      if (!isRed && dr !== 2)
+        return { success: false, reason: "La pedina panna cattura solo in giù" };
+    }
     board[toR][toC] = pieceVal;
     board[fromR][fromC] = '';
     board[midR][midC] = '';
     doPromotionIfNeeded(board, toR, toC);
     return { success: true };
   }
-  
+
   return { success: false, reason: "Mossa non valida: deve essere 1 o 2 caselle in diagonale" };
 }
 
 /****************************************************************
- * 11) doPromotionIfNeeded: promuove la pedina a re se raggiunge la riga finale
+ * 11) doPromotionIfNeeded: promuove in re se si raggiunge la riga finale
  ****************************************************************/
 function doPromotionIfNeeded(board, r, c) {
   const pieceVal = board[r][c];
   if (!pieceVal) return;
   if (pieceVal.endsWith('K')) return;
-  
   if (pieceVal === 'red' && r === 0) {
     board[r][c] = 'redK';
   }
@@ -368,8 +342,7 @@ function doPromotionIfNeeded(board, r, c) {
 }
 
 /****************************************************************
- * 12) updateBoardOnFirebase: salva la board su Firebase e passa il turno
- *    Se sameTurn = true, rimane lo stesso turno (per cattura multipla)
+ * 12) updateBoardOnFirebase: salva la board e passa il turno
  ****************************************************************/
 function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
   const ref = firebase.database().ref(`games/${currentGameId}`);
@@ -379,8 +352,9 @@ function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
       console.log("Nessuna partita trovata con ID", currentGameId);
       return;
     }
+    // Calcolo il turno successivo: se currentTurn è "red", passa a "panna", altrimenti a "red".
     const nextTurn = sameTurn ? currentTurn : (currentTurn === 'red' ? 'panna' : 'red');
-    console.log("Aggiorno board. Turno passa a:", nextTurn);
+    console.log("Aggiorno la board. Turno passa a:", nextTurn);
     ref.update({
       board: localBoard,
       turn: nextTurn
