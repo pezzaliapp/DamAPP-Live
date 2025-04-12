@@ -1,4 +1,4 @@
-// Sostituisci i valori con quelli del tuo progetto Firebase, se necessario
+// Sostituisci i valori con quelli del tuo progetto Firebase (se sono diversi):
 const firebaseConfig = {
   apiKey: "AIzaSyDBE9MmhzLZ3h-vIRI-sJi_0TBINAHiqcI",
   authDomain: "damapp-live.firebaseapp.com",
