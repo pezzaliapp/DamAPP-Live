@@ -35,7 +35,7 @@ h1 {
   box-sizing: border-box;
 }
 
-/* Pedine */
+/* Pedine normali e dame */
 .piece {
   border-radius: 50%;
   width: 40px;
@@ -48,8 +48,6 @@ h1 {
 .piece.black {
   background-color: #f5e3b3;
 }
-
-/* Dama (king): bordo d'oro per distinguerla */
 .piece.redK {
   background-color: red;
   border: 2px solid gold;
