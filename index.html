@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -6,14 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DamAPP Live</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Firebase v8 (compat) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <!-- Configurazione Firebase -->
   <script src="firebase-config.js" defer></script>
+  
+  <!-- Logica dell'app -->
   <script src="app.js" defer></script>
 </head>
 <body>
   <h1>DamAPP Live</h1>
+  
+  <!-- Mostra messaggi di stato (es. "Partita iniziata!") -->
   <div id="status"></div>
+  
+  <!-- Sezione separata in cui mostrare la lista utenti online -->
+  <div id="users" class="users"></div>
+
+  <!-- Contenitore per la scacchiera di gioco -->
   <div id="board" class="board"></div>
 </body>
 </html>
