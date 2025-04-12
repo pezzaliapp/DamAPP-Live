@@ -6,7 +6,7 @@ let playerColor = ''; // "red" o "black"
 let currentGameId = '';
 let userRef = null;
 
-// Per gestire la selezione del pezzo
+// Per gestire la selezione dei pezzi (click)
 let selectedCell = null; // {r, c} o null
 
 const usersRef = firebase.database().ref('users');
@@ -18,6 +18,7 @@ const gamesRef = firebase.database().ref('games');
 function init() {
   nickname = prompt("Inserisci il tuo nome") || "Guest" + Math.floor(Math.random() * 1000);
 
+  // Record utente
   userRef = usersRef.push({
     name: nickname,
     status: "online",
@@ -26,6 +27,7 @@ function init() {
     currentGame: ""
   });
 
+  // Se chiudo la pagina, rimuove il record utente
   userRef.onDisconnect().remove();
   
   // Aggiorniamo lastActive ogni 30s
@@ -36,9 +38,10 @@ function init() {
   document.getElementById("status").textContent =
     `Benvenuto, ${nickname}! Seleziona un utente da sfidare.`;
 
+  // Ascolta la lista utenti
   listenForUsers();
 
-  // Se nel record utente compare un currentGame, lo carico
+  // Se nel mio record compare un "currentGame", lo carico
   userRef.on("value", snapshot => {
     const data = snapshot.val();
     if (data.currentGame && data.currentGame !== currentGameId) {
@@ -85,9 +88,12 @@ function listenForUsers() {
 }
 
 /*********************************************
- * 3) Invia sfida a un altro utente
+ * 3) Invia sfida a un altro utente (io = rosso)
  *********************************************/
 function sendChallenge(targetId) {
+  // Io che mando l'invito sarò "rosso" e muovo per primo
+  // ma l'utente che ACCETTA creerà la partita
+  // e imposterà me come "red", se stesso come "black".
   usersRef.child(targetId).child("invite").set({
     from: nickname,
     fromId: userRef.key
@@ -99,14 +105,21 @@ function sendChallenge(targetId) {
  ****************************************************************/
 usersRef.on("child_changed", (snapshot) => {
   const data = snapshot.val();
+  // Se questo utente cambiato sono io e c'è un invito => me lo mostra
   if (data.name === nickname && data.invite) {
     const invite = data.invite;
     const accept = confirm(`${invite.from} ti ha sfidato. Accetti?`);
     if (accept) {
+      // Io che ACCETTO => sono "black"
+      // Metto inGame entrambi
       usersRef.child(snapshot.key).update({ inGame: true });
       usersRef.child(invite.fromId).update({ inGame: true });
+
+      // Avvio partita => ho in mano la logica, e so che "opponentId" = chi ha sfidato
+      // "selfId" = me
       startGameWith(invite.fromId, snapshot.key);
     } else {
+      // Se rifiuto, tolgo l'invito
       usersRef.child(snapshot.key).child("invite").remove();
     }
   }
@@ -114,29 +127,40 @@ usersRef.on("child_changed", (snapshot) => {
 
 /*************************************************
  * 5) startGameWith: crea la partita su Firebase
+ *    e fa in modo che "red" sia l'utente che ha sfidato
+ *    e "black" sia quello che accetta
  *************************************************/
 function startGameWith(opponentId, selfId) {
+  // Opponent = colui che mi ha invitato (rosso)
+  // Io = colui che accetta (nero)
+
   const gameId = Math.random().toString(36).substr(2, 5);
   currentGameId = gameId;
-  // Chi accetta è "black"
+  
+  // Imposto localmente che io (che sto accettando) sono black
   playerColor = 'black';
 
+  // Crea la partita su Firebase
   gamesRef.child(gameId).set({
     board: createInitialBoard(),
-    turn: 'red', // il primo turno tocca a "rosso"
+    turn: 'red', // Il primo turno tocca a rosso
     players: {
-      red: opponentId,
-      black: selfId
+      red: opponentId,  // colui che ha inviato la sfida
+      black: selfId     // me, che ho accettato
     }
   });
 
-  // Rimuovo inviti e imposto la partita su entrambi gli utenti
+  // Rimuovo l'invito su entrambi
   usersRef.child(selfId).child("invite").remove();
   usersRef.child(opponentId).child("invite").remove();
+
+  // Imposto il currentGame su entrambi
   usersRef.child(selfId).update({ currentGame: gameId });
   usersRef.child(opponentId).update({ currentGame: gameId });
 
+  // Ascolto la partita
   listenToGame(gameId);
+
   document.getElementById("status").textContent = "Partita iniziata!";
 }
 
@@ -163,8 +187,8 @@ function createInitialBoard() {
 }
 
 /*********************************************************************
- * 7) Ascolta i cambiamenti del game su Firebase. Ogni volta che
- *    board o turn cambiano, ri-renderizziamo.
+ * 7) Ascolta i cambiamenti del game su Firebase.
+ *    Ogni volta che board o turn cambiano, ri-renderizzo.
  *********************************************************************/
 function listenToGame(gameId) {
   const ref = firebase.database().ref(`games/${gameId}`);
@@ -216,58 +240,59 @@ function renderBoard(board, turn) {
 
 /***************************************************************
  * 9) Gestione click su una cella della board
- *    - Obbligo di cattura: se ci sono catture possibili, solo
- *      quelle sono consentite.
+ *    - Obbligo di cattura: se ci sono catture possibili, 
+ *      solo quelle sono consentite.
  *    - Cattura multipla: se dopo la prima cattura il pezzo
  *      può catturare ancora, lo stesso giocatore prosegue.
  ***************************************************************/
 function onSquareClick(board, turn, r, c) {
-  // 1) Se non è il mio turno, ignoro
+  // Se non è il mio turno, ignoro
   if (turn !== playerColor) return;
 
-  // 2) Verifico se esistono catture disponibili per il colore di turno
+  // Controllo eventuali catture disponibili per il colore di turno
   const captures = findAllCaptures(board, turn);
 
-  // 3) Se non ho un pezzo selezionato
+  // Se non ho un pezzo selezionato
   if (!selectedCell) {
+    // Se c'è un mio pezzo
     const pieceVal = board[r][c];
     if (pieceVal && pieceVal.startsWith(turn)) {
-      // Se ci sono catture e questo pezzo NON cattura, non lo seleziono
+      // Se ci sono catture e questo pezzo NON può catturare, non lo seleziono
       if (captures.length > 0) {
         const pieceCaptures = captures.filter(cap => cap.fromR === r && cap.fromC === c);
-        if (pieceCaptures.length === 0) return; // questo pezzo non può catturare
+        if (pieceCaptures.length === 0) return; 
       }
-      // Se va bene, seleziono
+      // Altrimenti seleziono
       selectedCell = { r, c };
       renderBoard(board, turn);
     }
   }
-  // 4) Se ho già selezionato un pezzo => provo a muovere/catturare
+  // Ho un pezzo selezionato => cerco di muoverlo/catturare
   else {
     const fromR = selectedCell.r;
     const fromC = selectedCell.c;
     const pieceVal = board[fromR][fromC];
 
-    // Se ci sono catture e questa mossa non è cattura, non consentire
+    // Se ci sono catture e la mossa non è una cattura => vietato
     const isCaptureMove = isThisMoveACapture(board, pieceVal, fromR, fromC, r, c);
     if (captures.length > 0 && !isCaptureMove) {
       return;
     }
 
-    // Tenta la mossa
+    // Provo a muovere
     const moveResult = tryMove(board, fromR, fromC, r, c);
     if (!moveResult.success) {
-      // mossa non valida
+      // Mossa non valida
       return;
     }
 
-    // Se è stata una cattura, controllo la cattura multipla
+    // Se è una cattura, controllo la cattura multipla
     if (moveResult.captureHappened) {
       const newR = r;
       const newC = c;
       const moreCaptures = findCapturesForPiece(board, newR, newC);
       if (moreCaptures.length > 0) {
-        // Rimango io il giocatore di turno => non aggiorno turn
+        // Resto io a giocare => non cambio turno
         selectedCell = { r: newR, c: newC };
         updateBoardOnFirebase(board, turn, /* sameTurn */ true);
         renderBoard(board, turn);
@@ -275,7 +300,7 @@ function onSquareClick(board, turn, r, c) {
       }
     }
 
-    // Altrimenti, ho concluso la mossa
+    // Fine della mossa
     selectedCell = null;
     updateBoardOnFirebase(board, turn, /* sameTurn */ false);
   }
@@ -308,7 +333,7 @@ function tryMove(board, fromR, fromC, toR, toC) {
     }
   }
 
-  // Sposta il pezzo
+  // Sposto il pezzo
   board[toR][toC] = pieceVal;
   board[fromR][fromC] = '';
 
@@ -319,31 +344,27 @@ function tryMove(board, fromR, fromC, toR, toC) {
 }
 
 /************************************************************************
- * 11) isThisMoveACapture: controlla se (fromR, fromC)->(toR, toC)
- *     costituisce una cattura (salto di 2 e pezzo avversario in mezzo).
+ * 11) isThisMoveACapture: verifica se (fromR,fromC)->(toR,toC)
+ *     è un salto di 2 in diagonale con pezzo avversario in mezzo
  ************************************************************************/
 function isThisMoveACapture(board, pieceVal, fromR, fromC, toR, toC) {
-  // deve essere un salto di 2 in diagonale
   if (Math.abs(toR - fromR) !== 2 || Math.abs(toC - fromC) !== 2) {
     return false;
   }
-  // la casella intermedia deve contenere un pezzo avversario
+  // La casella intermedia deve avere un pezzo avversario
   const midR = (fromR + toR) / 2;
   const midC = (fromC + toC) / 2;
   const midVal = board[midR][midC];
-  if (!midVal) return false; // vuota => no cattura
-
+  if (!midVal) return false;
   // Se è dello stesso colore => no cattura
   if (midVal.startsWith(pieceVal.startsWith('red') ? 'red' : 'black')) {
     return false;
   }
 
-  // Se non è una dama, controlla direzione
+  // Se non è un re, controlla la direzione
   const isKing = pieceVal.endsWith('K');
   const isRed = pieceVal.startsWith('red');
   if (!isKing) {
-    // rosso va verso l'alto => toR < fromR
-    // nero verso il basso => toR > fromR
     if (isRed && (toR - fromR) !== -2) return false;
     if (!isRed && (toR - fromR) !== 2) return false;
   }
@@ -356,12 +377,12 @@ function isThisMoveACapture(board, pieceVal, fromR, fromC, toR, toC) {
  ************************************************************************/
 function isValidStep(board, pieceVal, fromR, fromC, toR, toC) {
   if (Math.abs(toR - fromR) !== 1 || Math.abs(toC - fromC) !== 1) return false;
-
+  
   const isRed = pieceVal.startsWith('red');
   const isKing = pieceVal.endsWith('K');
 
   if (!isKing) {
-    if (isRed && (toR - fromR) !== -1) return false; // rosso risale
+    if (isRed && (toR - fromR) !== -1) return false; // rosso sale
     if (!isRed && (toR - fromR) !== 1) return false; // nero scende
   }
   return true;
@@ -412,7 +433,7 @@ function findCapturesForPiece(board, r, c) {
   const isRed = pieceVal.startsWith('red');
   const isKing = pieceVal.endsWith('K');
 
-  // Direzioni di salto: se è un re => ±2, altrimenti dipende dal colore
+  // Direzioni di salto: se è re => ±2, altrimenti dipende dal colore
   const rowDirs = isKing ? [-2, 2] : (isRed ? [-2] : [2]);
   const colDirs = [-2, 2];
 
