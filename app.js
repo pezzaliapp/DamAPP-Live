@@ -2,6 +2,7 @@
  * CONFIGURAZIONE REGOLAMENTO
  ***************************************/
 const forceCapture = true;  // Se true, la cattura è obbligatoria
+const testingMode = false;  // Imposta su true per test su un singolo dispositivo
 
 /***************************************
  * Riferimenti Firebase & Variabili Globali
@@ -188,7 +189,7 @@ function createInitialBoard() {
 }
 
 /*********************************************************************
- * 7) Ascolta la partita e assegna il colore locale in base al record dei giocatori
+ * 7) Ascolta la partita e assegna il colore locale
  *********************************************************************/
 function listenToGame(gameId) {
   const ref = firebase.database().ref(`games/${gameId}`);
@@ -243,14 +244,14 @@ function renderBoard(board, turn) {
 function onSquareClick(board, turn, r, c) {
   console.log(`Cliccato su cella (${r},${c}). Turno: ${turn} – Io: ${playerColor}`);
   
-  // Se il giocatore clicca quando non è il suo turno, mostra solo il messaggio e ritorna
-  if (turn !== playerColor) {
+  // Se il giocatore clicca quando non è il suo turno, mostra un messaggio e ritorna
+  if (!testingMode && turn !== playerColor) {
     console.log("Non è il mio turno");
     document.getElementById('status').textContent = "Attendi il tuo turno per muovere";
     return;
   }
   
-  // Se clicco la stessa cella già selezionata, deseleziona
+  // Se clicco sulla stessa cella già selezionata, deseleziona
   if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
     console.log("Deseleziono la pedina");
     selectedCell = null;
@@ -293,7 +294,7 @@ function onSquareClick(board, turn, r, c) {
       const extraCaps = findCapturesForPiece(board, r, c);
       if (extraCaps.length > 0) {
         selectedCell = { r, c };
-        updateBoardOnFirebase(board, turn, true); // turno non cambia
+        updateBoardOnFirebase(board, turn, true); // Turno non cambia
         renderBoard(board, turn);
         console.log("Cattura multipla: continua a catturare");
         return;
@@ -305,7 +306,7 @@ function onSquareClick(board, turn, r, c) {
 }
 
 /********************************************************************
- * 10) tryMove: verifica la validità della mossa (passo o cattura) e aggiorna la board
+ * 10) tryMove: verifica se la mossa è valida (passo o cattura) e aggiorna la board
  ********************************************************************/
 function tryMove(board, fromR, fromC, toR, toC) {
   if (board[toR][toC] !== '')
@@ -350,7 +351,7 @@ function tryMove(board, fromR, fromC, toR, toC) {
 }
 
 /****************************************************************
- * 11) doPromotionIfNeeded: promuove la pedina a re se raggiunge l'ultima riga
+ * 11) doPromotionIfNeeded: promuove a re se si raggiunge l'ultima riga
  ****************************************************************/
 function doPromotionIfNeeded(board, r, c) {
   const pieceVal = board[r][c];
@@ -379,12 +380,12 @@ function findAllCaptures(board, color) {
 }
 
 /****************************************************************
- * 13) findCapturesForPiece: ritorna le catture disponibili per il pezzo in (r,c)
+ * 13) findCapturesForPiece: ritorna le catture disponibili per il pezzo in (r, c)
  ****************************************************************/
 function findCapturesForPiece(board, r, c) {
   const piece = board[r][c];
   if (!piece) return [];
-  const directions = [[-2,-2], [-2,2], [2,-2], [2,2]];
+  const directions = [[-2,-2],[-2,2],[2,-2],[2,2]];
   const caps = [];
   directions.forEach(([dr, dc]) => {
     const newR = r + dr, newC = c + dc;
@@ -410,8 +411,7 @@ function isThisMoveACapture(board, piece, fromR, fromC, toR, toC) {
 
 /****************************************************************
  * 15) updateBoardOnFirebase: salva la board e passa il turno
- * Se sameTurn = true (cattura multipla), il turno non cambia.
- * Ho commentato la parte del controllo mosse, così il turno passa sempre.
+ * Se sameTurn = true (cattura multipla), il turno non cambia
  ****************************************************************/
 function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
   const ref = firebase.database().ref(`games/${currentGameId}`);
@@ -422,15 +422,6 @@ function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
       return;
     }
     const nextTurn = sameTurn ? currentTurn : (currentTurn === 'red' ? 'panna' : 'red');
-    
-    // Commentato per evitare blocchi: controlla se il giocatore successivo ha mosse legali
-    // if (!playerHasMoves(localBoard, nextTurn)) {
-    //   console.log(`Giocatore ${nextTurn} non ha mosse disponibili. Partita terminata.`);
-    //   ref.update({ board: localBoard, turn: nextTurn, finished: true });
-    //   document.getElementById('status').textContent = `Giocatore ${nextTurn.toUpperCase()} non ha mosse disponibili. PARTITA TERMINATA.`;
-    //   return;
-    // }
-    
     console.log("Aggiorno board. Turno passa a:", nextTurn);
     ref.update({ board: localBoard, turn: nextTurn });
   });
