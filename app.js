@@ -3,17 +3,16 @@ let nickname = '';
 let playerColor = '';
 let currentGameId = '';
 let userRef = null;
+let isCreator = false;
 
 const usersRef = firebase.database().ref('users');
 const gamesRef = firebase.database().ref('games');
 
 function init() {
   nickname = prompt("Inserisci il tuo nome") || "Guest" + Math.floor(Math.random() * 1000);
-
   userRef = usersRef.push({ name: nickname, status: "online", lastActive: Date.now(), inGame: false });
   userRef.onDisconnect().remove();
 
-  // Aggiorna lastActive ogni 30 secondi
   setInterval(() => {
     userRef.update({ lastActive: Date.now() });
   }, 30000);
@@ -59,26 +58,31 @@ usersRef.on("child_changed", (snapshot) => {
     if (accept) {
       usersRef.child(snapshot.key).update({ inGame: true });
       usersRef.child(data.invite.id).update({ inGame: true });
-      startGameWith(data.invite.id, snapshot.key);
+      startGameWith(data.invite.id, snapshot.key, false);
     } else {
       usersRef.child(snapshot.key).child("invite").remove();
     }
   }
 });
 
-function startGameWith(opponentId, selfId) {
+function startGameWith(opponentId, selfId, creator = true) {
   const gameId = Math.random().toString(36).substr(2, 5);
   currentGameId = gameId;
-  playerColor = 'black';
+  isCreator = creator;
 
-  gamesRef.child(gameId).set({
-    board: createInitialBoard(),
-    turn: 'red',
-    players: {
-      red: opponentId,
-      black: selfId
-    }
-  });
+  if (creator) {
+    playerColor = 'red';
+    gamesRef.child(gameId).set({
+      board: createInitialBoard(),
+      turn: 'red',
+      players: {
+        red: selfId,
+        black: opponentId
+      }
+    });
+  } else {
+    playerColor = 'black';
+  }
 
   usersRef.child(selfId).child("invite").remove();
   usersRef.child(opponentId).child("invite").remove();
@@ -107,12 +111,11 @@ function createInitialBoard() {
 }
 
 function listenToGame(gameId) {
-  playerColor = playerColor || (Math.random() > 0.5 ? 'red' : 'black');
   const ref = firebase.database().ref('games/' + gameId);
   ref.on('value', snapshot => {
     const data = snapshot.val();
-    if (data) {
-      renderBoard(data.board || []);
+    if (data && data.board) {
+      renderBoard(data.board);
     }
   });
 }
@@ -120,6 +123,8 @@ function listenToGame(gameId) {
 function renderBoard(board) {
   const container = document.getElementById('board');
   container.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'board';
   for (let r = 0; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
       const square = document.createElement('div');
@@ -129,9 +134,10 @@ function renderBoard(board) {
         piece.className = 'piece ' + board[r][c];
         square.appendChild(piece);
       }
-      container.appendChild(square);
+      grid.appendChild(square);
     }
   }
+  container.appendChild(grid);
 }
 
 function checkOpponentStatus(gameId) {
