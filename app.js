@@ -1,19 +1,52 @@
 /***************************************
- * Configurazione: modifica forceCapture
- * Se forceCapture = true, la cattura è obbligatoria;
- * se forceCapture = false, la cattura è facoltativa.
+ * CONFIGURAZIONE REGOLAMENTO
  ***************************************/
-const forceCapture = false;  // Impostalo su false per non bloccare la partita se non catturi
+const forceCapture = true;  
+// Se forceCapture = true, la cattura è obbligatoria e il giocatore 
+// deve scegliere la sequenza che massimizza il numero di catture.
 
 /***************************************
- * Riferimenti Firebase & Variabili
+ * FUNZIONI DI UTILITÀ
+ ***************************************/
+// Clona in maniera semplice una matrice della damiera
+function cloneBoard(board) {
+  return JSON.parse(JSON.stringify(board));
+}
+
+// Calcola il numero massimo di catture ottenibili da una determinata posizione
+function getMaxCapturesForPiece(board, r, c) {
+  const moves = findCapturesForPiece(board, r, c);
+  if (moves.length === 0) return 0;
+  let max = 0;
+  moves.forEach(move => {
+    let boardClone = cloneBoard(board);
+    // Simula la cattura
+    applyCaptureMove(boardClone, move);
+    let count = 1 + getMaxCapturesForPiece(boardClone, move.toR, move.toC);
+    if (count > max) max = count;
+  });
+  return max;
+}
+
+// Applica una mossa di cattura (modifica il board passato)
+function applyCaptureMove(board, move) {
+  let { fromR, fromC, toR, toC } = move;
+  let piece = board[fromR][fromC];
+  let midR = fromR + (toR - fromR) / 2;
+  let midC = fromC + (toC - fromC) / 2;
+  board[toR][toC] = piece;
+  board[fromR][fromC] = '';
+  board[midR][midC] = '';
+  doPromotionIfNeeded(board, toR, toC);
+}
+
+/***************************************
+ * VARIABILI GLOBALI E REFERENZE FIREBASE
  ***************************************/
 let nickname = '';
 let playerColor = ''; // 'red' oppure 'panna'
 let currentGameId = '';
 let userRef = null;
-
-// Variabile per gestire la selezione della pedina
 let selectedCell = null; // {r, c} oppure null
 
 const usersRef = firebase.database().ref('users');
@@ -24,7 +57,6 @@ const gamesRef = firebase.database().ref('games');
  **************************************************/
 function init() {
   nickname = prompt("Inserisci il tuo nome") || "Guest" + Math.floor(Math.random() * 1000);
-  
   userRef = usersRef.push({
     name: nickname,
     status: "online",
@@ -33,19 +65,11 @@ function init() {
     currentGame: ""
   });
   userRef.onDisconnect().remove();
-
-  // Aggiorna lastActive ogni 30 sec.
-  setInterval(() => {
-    userRef.update({ lastActive: Date.now() });
-  }, 30000);
-
+  setInterval(() => { userRef.update({ lastActive: Date.now() }); }, 30000);
   document.getElementById("status").textContent =
     `Benvenuto, ${nickname}! Seleziona un utente da sfidare.`;
   console.log(`Benvenuto ${nickname}`);
-
   listenForUsers();
-
-  // Se il record utente viene aggiornato con un "currentGame", carica la partita.
   userRef.on("value", snapshot => {
     const data = snapshot.val();
     if (data.currentGame && data.currentGame !== currentGameId) {
@@ -61,7 +85,7 @@ function init() {
  * 2) Visualizza utenti online (non in gioco)
  ****************************************************/
 function listenForUsers() {
-  usersRef.on("value", (snapshot) => {
+  usersRef.on("value", snapshot => {
     const usersContainer = document.getElementById("users");
     const now = Date.now();
     usersContainer.innerHTML = `
@@ -90,10 +114,7 @@ function listenForUsers() {
  *********************************************/
 function sendChallenge(targetId) {
   console.log(`Invio sfida a ${targetId}`);
-  usersRef.child(targetId).child("invite").set({
-    from: nickname,
-    fromId: userRef.key
-  });
+  usersRef.child(targetId).child("invite").set({ from: nickname, fromId: userRef.key });
 }
 
 /****************************************************************
@@ -127,10 +148,9 @@ function startGameWith(opponentId, selfId) {
   console.log(`Creo partita ${gameId}. Opponent (red): ${opponentId}, Io (panna): ${selfId}`);
   gamesRef.child(gameId).set({
     board: createInitialBoard(),
-    turn: 'red',  // Turno iniziale: red
+    turn: 'red',
     players: { red: opponentId, panna: selfId }
   });
-  // Rimuove inviti e assegna la partita agli utenti
   usersRef.child(selfId).child("invite").remove();
   usersRef.child(opponentId).child("invite").remove();
   usersRef.child(selfId).update({ currentGame: gameId });
@@ -141,21 +161,17 @@ function startGameWith(opponentId, selfId) {
 
 /*******************************************************
  * 6) Creazione damiera iniziale (8x8)
- * – Le tre righe superiori contengono pedine "panna" (accettante)
- * – Le tre righe inferiori contengono pedine "red" (challenger)
+ * - Le tre righe superiori contengono pedine "panna" (accettante)
+ * - Le tre righe inferiori contengono pedine "red" (challenger)
  *******************************************************/
 function createInitialBoard() {
   const board = [];
   for (let r = 0; r < 8; r++) {
     const row = [];
     for (let c = 0; c < 8; c++) {
-      if ((r+c) % 2 === 1 && r < 3) {
-        row.push('panna');
-      } else if ((r+c) % 2 === 1 && r > 4) {
-        row.push('red');
-      } else {
-        row.push('');
-      }
+      if ((r + c) % 2 === 1 && r < 3) row.push('panna');
+      else if ((r + c) % 2 === 1 && r > 4) row.push('red');
+      else row.push('');
     }
     board.push(row);
   }
@@ -170,11 +186,8 @@ function listenToGame(gameId) {
   ref.on('value', snapshot => {
     const data = snapshot.val();
     if (data && data.board) {
-      if (data.players.red === userRef.key) {
-        playerColor = 'red';
-      } else if (data.players.panna === userRef.key) {
-        playerColor = 'panna';
-      }
+      if (data.players.red === userRef.key) playerColor = 'red';
+      else if (data.players.panna === userRef.key) playerColor = 'panna';
       console.log(`Assegnato playerColor: ${playerColor} per l'utente ${userRef.key}`);
       renderBoard(data.board, data.turn);
     }
@@ -188,9 +201,7 @@ function renderBoard(board, turn) {
   console.log(`renderBoard: Turno di ${turn}. Io sono ${playerColor}`);
   const container = document.getElementById('board');
   container.innerHTML = '';
-  if (turn) {
-    document.getElementById('status').textContent = `Turno di ${turn.toUpperCase()}`;
-  }
+  if (turn) document.getElementById('status').textContent = `Turno di ${turn.toUpperCase()}`;
   
   let rowIndices = [];
   if (playerColor === 'panna') {
@@ -202,7 +213,7 @@ function renderBoard(board, turn) {
   rowIndices.forEach(r => {
     for (let c = 0; c < board[r].length; c++) {
       const square = document.createElement('div');
-      square.className = 'square ' + (((r+c) % 2 === 0) ? 'light' : 'dark');
+      square.className = 'square ' + (((r + c) % 2 === 0) ? 'light' : 'dark');
       if (selectedCell && selectedCell.r === r && selectedCell.c === c)
         square.classList.add('selected');
       const pieceVal = board[r][c];
@@ -218,12 +229,12 @@ function renderBoard(board, turn) {
 }
 
 /***************************************************************
- * 9) onSquareClick: gestisce selezione, deselezione e movimento
+ * 9) onSquareClick: gestisce la selezione, deselezione e il movimento
  ***************************************************************/
 function onSquareClick(board, turn, r, c) {
   console.log(`Cliccato su cella (${r},${c}). Turno: ${turn} – Io: ${playerColor}`);
   
-  // Se clicco due volte sulla stessa cella, deseleziono
+  // Se clicco nuovamente sulla stessa cella, deseleziona
   if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
     console.log("Deseleziono la pedina");
     selectedCell = null;
@@ -236,19 +247,22 @@ function onSquareClick(board, turn, r, c) {
     return;
   }
   
-  // Calcola tutte le catture disponibili per il colore in turno
+  // Verifica le catture obbligatorie
   const availableCaptures = findAllCaptures(board, turn);
   
   if (!selectedCell) {
     const pieceVal = board[r][c];
     if (pieceVal && pieceVal.startsWith(turn)) {
-      // Se forceCapture è attivo, seleziona solo se questo pezzo può catturare
+      // Se forceCapture è attivo, seleziona solo se il pezzo può ottenere il massimo numero di catture
       if (forceCapture && availableCaptures.length > 0) {
         const capForPiece = availableCaptures.filter(cap => cap.fromR === r && cap.fromC === c);
         if (capForPiece.length === 0) {
           console.log("Devi catturare: questa pedina non può");
           return;
         }
+        // Calcola il massimo numero di catture disponibili per questo pezzo
+        const maxForPiece = getMaxCapturesForPiece(board, r, c);
+        console.log(`Max catture possibili per questa pedina: ${maxForPiece}`);
       }
       selectedCell = { r, c };
       console.log(`Pedina in (${r},${c}) selezionata`);
@@ -260,22 +274,35 @@ function onSquareClick(board, turn, r, c) {
     const fromR = selectedCell.r, fromC = selectedCell.c;
     const currentPiece = board[fromR][fromC];
     const isCap = isThisMoveACapture(board, currentPiece, fromR, fromC, r, c);
-    // Se forceCapture è attivo e c'è almeno una cattura disponibile, ma questa mossa non è cattura, rifiuta la mossa
     if (forceCapture && availableCaptures.length > 0 && !isCap) {
       console.log("Mossa rifiutata: devi catturare");
       return;
+    }
+    // Se la mossa è di cattura e forceCapture è attivo, controlla di massimizzare il numero di catture
+    if (forceCapture && isCap) {
+      const maxCurrent = getMaxCapturesForPiece(board, fromR, fromC);
+      // Clona la board e applica la mossa per valutare quante catture si ottengono in questo ramo
+      let boardClone = cloneBoard(board);
+      let simulatedMove = { fromR, fromC, toR: r, toC: c };
+      applyCaptureMove(boardClone, simulatedMove);
+      const capturesAchieved = 1 + getMaxCapturesForPiece(boardClone, r, c);
+      console.log(`Catture ottenute con questa mossa: ${capturesAchieved} (max possibili: ${maxCurrent})`);
+      if (capturesAchieved < maxCurrent) {
+        console.log("Devi effettuare una cattura che massimizzi il numero di pezzi mangiati");
+        return;
+      }
     }
     const moveResult = tryMove(board, fromR, fromC, r, c);
     if (!moveResult.success) {
       console.log("Mossa rifiutata:", moveResult.reason);
       return;
     }
-    // Se la mossa è una cattura, controlla la cattura multipla
+    // Se la mossa è una cattura, controlla la possibilità di ulteriori catture (cattura multipla)
     if (isCap) {
       const extraCaps = findCapturesForPiece(board, r, c);
       if (extraCaps.length > 0) {
         selectedCell = { r, c };
-        updateBoardOnFirebase(board, turn, true); // non cambio turno
+        updateBoardOnFirebase(board, turn, true); // Turno non cambia
         renderBoard(board, turn);
         console.log("Cattura multipla: continua a catturare");
         return;
@@ -287,7 +314,7 @@ function onSquareClick(board, turn, r, c) {
 }
 
 /********************************************************************
- * 10) tryMove: valida la mossa (passo semplice o cattura) e aggiorna la board
+ * 10) tryMove: verifica la validità della mossa (passo semplice o cattura) e aggiorna la board
  ********************************************************************/
 function tryMove(board, fromR, fromC, toR, toC) {
   if (board[toR][toC] !== '')
@@ -332,7 +359,7 @@ function tryMove(board, fromR, fromC, toR, toC) {
 }
 
 /****************************************************************
- * 11) doPromotionIfNeeded: promuove la pedina a re se raggiunge l'ultima riga
+ * 11) doPromotionIfNeeded: promuove a re se si raggiunge l'ultima riga
  ****************************************************************/
 function doPromotionIfNeeded(board, r, c) {
   const pieceVal = board[r][c];
@@ -344,7 +371,7 @@ function doPromotionIfNeeded(board, r, c) {
 }
 
 /****************************************************************
- * 12) findAllCaptures: ritorna tutte le catture disponibili per il colore in turno
+ * 12) findAllCaptures: ritorna tutte le catture disponibili per il colore
  ****************************************************************/
 function findAllCaptures(board, color) {
   const caps = [];
@@ -366,7 +393,7 @@ function findAllCaptures(board, color) {
 function findCapturesForPiece(board, r, c) {
   const piece = board[r][c];
   if (!piece) return [];
-  const directions = [[-2,-2],[-2,2],[2,-2],[2,2]];
+  const directions = [[-2,-2], [-2,2], [2,-2], [2,2]];
   const caps = [];
   directions.forEach(([dr, dc]) => {
     const newR = r + dr, newC = c + dc;
