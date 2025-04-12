@@ -1,7 +1,7 @@
 /***************************************
  * CONFIGURAZIONE REGOLAMENTO
  ***************************************/
-const forceCapture = true;  // Se true, la cattura è obbligatoria; se false, è facoltativa
+const forceCapture = true;  // Se true, la cattura è obbligatoria
 
 /***************************************
  * Riferimenti Firebase & Variabili Globali
@@ -17,14 +17,14 @@ const usersRef = firebase.database().ref('users');
 const gamesRef = firebase.database().ref('games');
 
 /***************************************
- * Funzione di utilità: clona la board
+ * Funzione helper: clona la board
  ***************************************/
 function cloneBoard(board) {
   return JSON.parse(JSON.stringify(board));
 }
 
 /***************************************
- * Funzione helper: verifica se un giocatore ha mosse legali
+ * Funzione helper: controlla se un giocatore ha mosse legali
  ***************************************/
 function playerHasMoves(board, color) {
   for (let r = 0; r < board.length; r++) {
@@ -34,9 +34,9 @@ function playerHasMoves(board, color) {
         let simpleDirs = [];
         const isKing = piece.endsWith('K');
         if (isKing) {
-          simpleDirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+          simpleDirs = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
         } else {
-          simpleDirs = color === 'red' ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]];
+          simpleDirs = color === 'red' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
         }
         for (let [dr, dc] of simpleDirs) {
           let newR = r + dr, newC = c + dc;
@@ -178,8 +178,8 @@ function createInitialBoard() {
   for (let r = 0; r < 8; r++) {
     const row = [];
     for (let c = 0; c < 8; c++) {
-      if ((r+c)%2===1 && r < 3) row.push('panna');
-      else if ((r+c)%2===1 && r > 4) row.push('red');
+      if ((r+c) % 2 === 1 && r < 3) row.push('panna');
+      else if ((r+c) % 2 === 1 && r > 4) row.push('red');
       else row.push('');
     }
     board.push(row);
@@ -243,14 +243,14 @@ function renderBoard(board, turn) {
 function onSquareClick(board, turn, r, c) {
   console.log(`Cliccato su cella (${r},${c}). Turno: ${turn} – Io: ${playerColor}`);
   
-  // Se il giocatore clicca quando non è il suo turno, mostra un messaggio e restituisce senza bloccare il gioco
+  // Se il giocatore clicca quando non è il suo turno, mostra solo il messaggio e ritorna
   if (turn !== playerColor) {
     console.log("Non è il mio turno");
     document.getElementById('status').textContent = "Attendi il tuo turno per muovere";
     return;
   }
   
-  // Se clicco sulla stessa cella già selezionata, deseleziona
+  // Se clicco la stessa cella già selezionata, deseleziona
   if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
     console.log("Deseleziono la pedina");
     selectedCell = null;
@@ -293,7 +293,7 @@ function onSquareClick(board, turn, r, c) {
       const extraCaps = findCapturesForPiece(board, r, c);
       if (extraCaps.length > 0) {
         selectedCell = { r, c };
-        updateBoardOnFirebase(board, turn, true); // Turno non cambia
+        updateBoardOnFirebase(board, turn, true); // turno non cambia
         renderBoard(board, turn);
         console.log("Cattura multipla: continua a catturare");
         return;
@@ -305,7 +305,7 @@ function onSquareClick(board, turn, r, c) {
 }
 
 /********************************************************************
- * 10) tryMove: verifica la validità della mossa (passo semplice o cattura) e aggiorna la board
+ * 10) tryMove: verifica la validità della mossa (passo o cattura) e aggiorna la board
  ********************************************************************/
 function tryMove(board, fromR, fromC, toR, toC) {
   if (board[toR][toC] !== '')
@@ -333,7 +333,7 @@ function tryMove(board, fromR, fromC, toR, toC) {
   
   // Cattura: 2 caselle in diagonale
   if (Math.abs(dr) === 2 && Math.abs(dc) === 2) {
-    const midR = fromR + dr / 2, midC = fromC + dc / 2;
+    const midR = fromR + dr/2, midC = fromC + dc/2;
     const enemy = board[midR][midC];
     if (!enemy)
       return { success: false, reason: "Nessun nemico da catturare" };
@@ -384,7 +384,7 @@ function findAllCaptures(board, color) {
 function findCapturesForPiece(board, r, c) {
   const piece = board[r][c];
   if (!piece) return [];
-  const directions = [[-2,-2],[-2,2],[2,-2],[2,2]];
+  const directions = [[-2,-2], [-2,2], [2,-2], [2,2]];
   const caps = [];
   directions.forEach(([dr, dc]) => {
     const newR = r + dr, newC = c + dc;
@@ -410,7 +410,8 @@ function isThisMoveACapture(board, piece, fromR, fromC, toR, toC) {
 
 /****************************************************************
  * 15) updateBoardOnFirebase: salva la board e passa il turno
- * Se sameTurn = true (cattura multipla), il turno non cambia
+ * Se sameTurn = true (cattura multipla), il turno non cambia.
+ * Ho commentato la parte del controllo mosse, così il turno passa sempre.
  ****************************************************************/
 function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
   const ref = firebase.database().ref(`games/${currentGameId}`);
@@ -421,13 +422,15 @@ function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
       return;
     }
     const nextTurn = sameTurn ? currentTurn : (currentTurn === 'red' ? 'panna' : 'red');
-    // Controlla se il giocatore successivo ha mosse legali; se no, termina la partita.
-    if (!playerHasMoves(localBoard, nextTurn)) {
-      console.log(`Giocatore ${nextTurn} non ha mosse disponibili. Partita terminata.`);
-      ref.update({ board: localBoard, turn: nextTurn, finished: true });
-      document.getElementById('status').textContent = `Giocatore ${nextTurn.toUpperCase()} non ha mosse disponibili. PARTITA TERMINATA.`;
-      return;
-    }
+    
+    // Commentato per evitare blocchi: controlla se il giocatore successivo ha mosse legali
+    // if (!playerHasMoves(localBoard, nextTurn)) {
+    //   console.log(`Giocatore ${nextTurn} non ha mosse disponibili. Partita terminata.`);
+    //   ref.update({ board: localBoard, turn: nextTurn, finished: true });
+    //   document.getElementById('status').textContent = `Giocatore ${nextTurn.toUpperCase()} non ha mosse disponibili. PARTITA TERMINATA.`;
+    //   return;
+    // }
+    
     console.log("Aggiorno board. Turno passa a:", nextTurn);
     ref.update({ board: localBoard, turn: nextTurn });
   });
