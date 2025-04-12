@@ -1,24 +1,19 @@
 
 <!DOCTYPE html>
-<html>
+<html lang="it">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DamAPP Live</title>
-  <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css" />
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
-  <script src="firebase-config.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="firebase-config.js" defer></script>
+  <script src="app.js" defer></script>
 </head>
 <body>
   <h1>DamAPP Live</h1>
-  <input id="nickname" placeholder="Inserisci il tuo nome" />
-  <button onclick="createGame()">Crea partita</button>
-  <input id="roomId" placeholder="Codice partita" />
-  <button onclick="joinGame()">Entra nella partita</button>
   <div id="status"></div>
   <div id="board" class="board"></div>
-  <script src="app.js"></script>
 </body>
 </html>
