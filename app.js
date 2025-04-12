@@ -1,3 +1,2 @@
-
-// Placeholder per la nuova logica corretta
-console.log("DamAPP Live FixFinal avviato");
+console.log("DamAPP Live - app.js placeholder");
+// Firebase config da sostituire qui

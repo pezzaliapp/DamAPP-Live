@@ -1,26 +1,43 @@
-
 body {
-    font-family: sans-serif;
-    background-color: #1c1c1c;
-    color: white;
-    text-align: center;
+  font-family: Arial, sans-serif;
+  text-align: center;
+  background: #1e1e1e;
+  color: white;
+}
+input, button {
+  margin: 5px;
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
 }
 .board {
-    display: grid;
-    grid-template-columns: repeat(8, 40px);
-    margin: 20px auto;
+  display: grid;
+  grid-template-columns: repeat(8, 40px);
+  grid-template-rows: repeat(8, 40px);
+  gap: 0;
+  margin: 20px auto;
+  width: max-content;
 }
 .square {
-    width: 40px;
-    height: 40px;
+  width: 40px;
+  height: 40px;
 }
-.square.light { background: #f0f0f0; }
-.square.dark { background: #333; }
+.light {
+  background: #eee;
+}
+.dark {
+  background: #444;
+}
 .piece {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    margin: 5px auto;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  margin: auto;
+  margin-top: 5px;
 }
-.piece.red { background: red; }
-.piece.black { background: #f5e3b3; }
+.red {
+  background: red;
+}
+.black {
+  background: #f5deb3;
+}

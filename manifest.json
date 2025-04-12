@@ -1,11 +1,10 @@
-
 {
   "name": "DamAPP Live",
-  "short_name": "DamAPP",
+  "short_name": "DamAPP Live",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#000000",
-  "description": "Gioca a dama in tempo reale via internet con altri utenti.",
+  "background_color": "#1e1e1e",
+  "description": "Gioca a dama in tempo reale con altri utenti nel mondo",
   "icons": [
     {
       "src": "icon/DamAPP-Live-192.png",
