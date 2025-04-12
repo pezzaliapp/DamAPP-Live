@@ -9,26 +9,16 @@ const gamesRef = firebase.database().ref('games');
 
 function init() {
   nickname = prompt("Inserisci il tuo nome") || "Guest" + Math.floor(Math.random() * 1000);
-  
 
-userRef = usersRef.push({ name: nickname, status: "online", lastActive: Date.now(), inGame: false });
-userRef.onDisconnect().remove();
-
-// Aggiorna lastActive ogni 30 secondi
-setInterval(() => {
-  userRef.update({ lastActive: Date.now() });
-}, 30000);
-
-userRef.onDisconnect().remove();
-
-// Aggiorna lastActive ogni 30 secondi
-setInterval(() => {
-  userRef.update({ lastActive: Date.now() });
-}, 30000);
-
+  userRef = usersRef.push({ name: nickname, status: "online", lastActive: Date.now(), inGame: false });
   userRef.onDisconnect().remove();
+
+  // Aggiorna lastActive ogni 30 secondi
+  setInterval(() => {
+    userRef.update({ lastActive: Date.now() });
+  }, 30000);
+
   listenForUsers();
-  renderLobby();
 }
 
 function listenForUsers() {
@@ -36,15 +26,12 @@ function listenForUsers() {
     const userList = document.getElementById("board");
     userList.innerHTML = "<h3>Ciao, " + nickname + "</h3><h4>Utenti online:</h4><ul id='user-list'></ul>";
     const ul = document.getElementById("user-list");
-    
-const now = Date.now();
-snapshot.forEach((child) => {
-  const user = child.val();
-  
-if (!user.lastActive || now - user.lastActive > 60000 || user.inGame) return;
- // ignora utenti inattivi da >60s
 
+    const now = Date.now();
+    snapshot.forEach((child) => {
       const user = child.val();
+      if (!user.lastActive || now - user.lastActive > 60000 || user.inGame) return;
+
       const li = document.createElement("li");
       li.textContent = user.name + " 🟢";
       if (user.name !== nickname) {
@@ -70,11 +57,9 @@ usersRef.on("child_changed", (snapshot) => {
   if (data.invite && data.name === nickname) {
     const accept = confirm(data.invite.from + " ti ha sfidato. Accetti?");
     if (accept) {
-      
-usersRef.child(snapshot.key).update({ inGame: true });
-usersRef.child(data.invite.id).update({ inGame: true });
-startGameWith(data.invite.id, snapshot.key);
-
+      usersRef.child(snapshot.key).update({ inGame: true });
+      usersRef.child(data.invite.id).update({ inGame: true });
+      startGameWith(data.invite.id, snapshot.key);
     } else {
       usersRef.child(snapshot.key).child("invite").remove();
     }
@@ -99,10 +84,8 @@ function startGameWith(opponentId, selfId) {
   usersRef.child(opponentId).child("invite").remove();
 
   document.getElementById("status").textContent = "Partita iniziata!";
-  
-listenToGame(gameId);
-checkOpponentStatus(gameId);
-
+  listenToGame(gameId);
+  checkOpponentStatus(gameId);
 }
 
 function createInitialBoard() {
@@ -151,9 +134,6 @@ function renderBoard(board) {
   }
 }
 
-window.onload = init;
-
-
 function checkOpponentStatus(gameId) {
   firebase.database().ref('games/' + gameId + '/players').once('value').then(snapshot => {
     const players = snapshot.val();
@@ -166,3 +146,5 @@ function checkOpponentStatus(gameId) {
     });
   });
 }
+
+window.onload = init;
