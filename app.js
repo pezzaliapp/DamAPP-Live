@@ -4,7 +4,6 @@ let playerColor = '';
 let currentGameId = '';
 let userRef = null;
 
-// Firebase paths
 const usersRef = firebase.database().ref('users');
 const gamesRef = firebase.database().ref('games');
 
@@ -18,19 +17,20 @@ function init() {
 
 function listenForUsers() {
   usersRef.on("value", (snapshot) => {
-    const userList = document.getElementById("user-list");
-    userList.innerHTML = "";
+    const userList = document.getElementById("board");
+    userList.innerHTML = "<h3>Ciao, " + nickname + "</h3><h4>Utenti online:</h4><ul id='user-list'></ul>";
+    const ul = document.getElementById("user-list");
     snapshot.forEach((child) => {
       const user = child.val();
       const li = document.createElement("li");
-      li.textContent = user.name + (user.status === "online" ? " 🟢" : " 🔴");
-      if (user.name !== nickname && user.status === "online") {
+      li.textContent = user.name + " 🟢";
+      if (user.name !== nickname) {
         const btn = document.createElement("button");
         btn.textContent = "Sfida";
         btn.onclick = () => sendChallenge(child.key);
         li.appendChild(btn);
       }
-      userList.appendChild(li);
+      ul.appendChild(li);
     });
   });
 }
@@ -42,20 +42,10 @@ function sendChallenge(targetId) {
   });
 }
 
-function renderLobby() {
-  const container = document.getElementById("board");
-  container.innerHTML = `
-    <h3>Ciao, ${nickname}</h3>
-    <h4>Utenti online:</h4>
-    <ul id="user-list"></ul>
-  `;
-}
-
-// Ascolta inviti in arrivo
 usersRef.on("child_changed", (snapshot) => {
   const data = snapshot.val();
   if (data.invite && data.name === nickname) {
-    const accept = confirm(`${data.invite.from} ti ha sfidato a una partita. Accetti?`);
+    const accept = confirm(data.invite.from + " ti ha sfidato. Accetti?");
     if (accept) {
       startGameWith(data.invite.id, snapshot.key);
     } else {
@@ -78,11 +68,9 @@ function startGameWith(opponentId, selfId) {
     }
   });
 
-  // Rimuovi inviti
   usersRef.child(selfId).child("invite").remove();
   usersRef.child(opponentId).child("invite").remove();
 
-  // Avvia la partita
   document.getElementById("status").textContent = "Partita iniziata!";
   listenToGame(gameId);
 }
@@ -106,6 +94,7 @@ function createInitialBoard() {
 }
 
 function listenToGame(gameId) {
+  playerColor = playerColor || (Math.random() > 0.5 ? 'red' : 'black');
   const ref = firebase.database().ref('games/' + gameId);
   ref.on('value', snapshot => {
     const data = snapshot.val();
@@ -122,19 +111,14 @@ function renderBoard(board) {
     for (let c = 0; c < 8; c++) {
       const square = document.createElement('div');
       square.className = 'square ' + ((r + c) % 2 === 0 ? 'light' : 'dark');
-      square.dataset.row = r;
-      square.dataset.col = c;
-
       if (board[r][c]) {
         const piece = document.createElement('div');
         piece.className = 'piece ' + board[r][c];
         square.appendChild(piece);
       }
-
       container.appendChild(square);
     }
   }
 }
 
-// Avvia
 window.onload = init;
