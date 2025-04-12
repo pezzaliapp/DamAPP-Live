@@ -1,11 +1,12 @@
 
-// Sostituisci questi valori con quelli reali del tuo progetto Firebase
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "SENDER_ID",
-  appId: "APP_ID"
+  apiKey: "AIzaSyDBE9MmhzLZ3h-vIRI-sJi_0TBINAHiqcI",
+  authDomain: "damapp-live.firebaseapp.com",
+  databaseURL: "https://damapp-live-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "damapp-live",
+  storageBucket: "damapp-live.appspot.com",
+  messagingSenderId: "200514528885",
+  appId: "1:200514528885:web:943d6def84eb3d12a5fa3c"
 };
+
+firebase.initializeApp(firebaseConfig);
