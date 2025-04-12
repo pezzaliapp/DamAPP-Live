@@ -1,4 +1,11 @@
 /***************************************
+ * Configurazione: modifica forceCapture
+ * Se forceCapture = true, la cattura è obbligatoria;
+ * se forceCapture = false, la cattura è facoltativa.
+ ***************************************/
+const forceCapture = false;  // Impostalo su false per non bloccare la partita se non catturi
+
+/***************************************
  * Riferimenti Firebase & Variabili
  ***************************************/
 let nickname = '';
@@ -6,7 +13,7 @@ let playerColor = ''; // 'red' oppure 'panna'
 let currentGameId = '';
 let userRef = null;
 
-// Per gestire la selezione della pedina
+// Variabile per gestire la selezione della pedina
 let selectedCell = null; // {r, c} oppure null
 
 const usersRef = firebase.database().ref('users');
@@ -27,7 +34,7 @@ function init() {
   });
   userRef.onDisconnect().remove();
 
-  // Aggiorna lastActive ogni 30 secondi
+  // Aggiorna lastActive ogni 30 sec.
   setInterval(() => {
     userRef.update({ lastActive: Date.now() });
   }, 30000);
@@ -38,7 +45,7 @@ function init() {
 
   listenForUsers();
 
-  // Se nel record utente compare un currentGame, carica la partita
+  // Se il record utente viene aggiornato con un "currentGame", carica la partita.
   userRef.on("value", snapshot => {
     const data = snapshot.val();
     if (data.currentGame && data.currentGame !== currentGameId) {
@@ -90,7 +97,7 @@ function sendChallenge(targetId) {
 }
 
 /****************************************************************
- * 4) Ascolta cambiamenti per ricevere sfide (invite)
+ * 4) Ricezione sfide: ascolta modifiche per "invite"
  ****************************************************************/
 usersRef.on("child_changed", snapshot => {
   const data = snapshot.val();
@@ -123,7 +130,7 @@ function startGameWith(opponentId, selfId) {
     turn: 'red',  // Turno iniziale: red
     players: { red: opponentId, panna: selfId }
   });
-  // Rimuovi inviti e assegna la partita a entrambi
+  // Rimuove inviti e assegna la partita agli utenti
   usersRef.child(selfId).child("invite").remove();
   usersRef.child(opponentId).child("invite").remove();
   usersRef.child(selfId).update({ currentGame: gameId });
@@ -134,17 +141,17 @@ function startGameWith(opponentId, selfId) {
 
 /*******************************************************
  * 6) Creazione damiera iniziale (8x8)
- * Le tre righe superiori contengono "panna" (accettante)
- * Le tre righe inferiori contengono "red" (challenger)
+ * – Le tre righe superiori contengono pedine "panna" (accettante)
+ * – Le tre righe inferiori contengono pedine "red" (challenger)
  *******************************************************/
 function createInitialBoard() {
   const board = [];
   for (let r = 0; r < 8; r++) {
     const row = [];
     for (let c = 0; c < 8; c++) {
-      if ((r+c)%2===1 && r < 3) {
+      if ((r+c) % 2 === 1 && r < 3) {
         row.push('panna');
-      } else if ((r+c)%2===1 && r > 4) {
+      } else if ((r+c) % 2 === 1 && r > 4) {
         row.push('red');
       } else {
         row.push('');
@@ -156,7 +163,7 @@ function createInitialBoard() {
 }
 
 /*********************************************************************
- * 7) Ascolta la partita e assegna il colore al giocatore locale
+ * 7) Ascolta la partita e assegna il colore locale
  *********************************************************************/
 function listenToGame(gameId) {
   const ref = firebase.database().ref(`games/${gameId}`);
@@ -175,35 +182,29 @@ function listenToGame(gameId) {
 }
 
 /**************************************************************
- * 8) renderBoard: disegna la damiera e inverte l'orientamento per "panna"
+ * 8) renderBoard: disegna la damiera; se sei "panna" inverte l'ordine delle righe
  **************************************************************/
 function renderBoard(board, turn) {
   console.log(`renderBoard: Turno di ${turn}. Io sono ${playerColor}`);
   const container = document.getElementById('board');
   container.innerHTML = '';
-  
   if (turn) {
     document.getElementById('status').textContent = `Turno di ${turn.toUpperCase()}`;
   }
   
   let rowIndices = [];
   if (playerColor === 'panna') {
-    for (let r = board.length - 1; r >= 0; r--) {
-      rowIndices.push(r);
-    }
+    for (let r = board.length - 1; r >= 0; r--) rowIndices.push(r);
   } else {
-    for (let r = 0; r < board.length; r++) {
-      rowIndices.push(r);
-    }
+    for (let r = 0; r < board.length; r++) rowIndices.push(r);
   }
   
   rowIndices.forEach(r => {
     for (let c = 0; c < board[r].length; c++) {
       const square = document.createElement('div');
       square.className = 'square ' + (((r+c) % 2 === 0) ? 'light' : 'dark');
-      if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
+      if (selectedCell && selectedCell.r === r && selectedCell.c === c)
         square.classList.add('selected');
-      }
       const pieceVal = board[r][c];
       if (pieceVal) {
         const piece = document.createElement('div');
@@ -217,12 +218,12 @@ function renderBoard(board, turn) {
 }
 
 /***************************************************************
- * 9) onSquareClick: gestione dei click per selezionare, deselezionare e muovere
+ * 9) onSquareClick: gestisce selezione, deselezione e movimento
  ***************************************************************/
 function onSquareClick(board, turn, r, c) {
   console.log(`Cliccato su cella (${r},${c}). Turno: ${turn} – Io: ${playerColor}`);
   
-  // Se clicco la stessa cella già selezionata, deselection
+  // Se clicco due volte sulla stessa cella, deseleziono
   if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
     console.log("Deseleziono la pedina");
     selectedCell = null;
@@ -235,14 +236,14 @@ function onSquareClick(board, turn, r, c) {
     return;
   }
   
-  // Calcola le catture disponibili (obbligatorie)
+  // Calcola tutte le catture disponibili per il colore in turno
   const availableCaptures = findAllCaptures(board, turn);
   
   if (!selectedCell) {
     const pieceVal = board[r][c];
     if (pieceVal && pieceVal.startsWith(turn)) {
-      // Se esistono catture, seleziona solo se questo pezzo può catturare
-      if (availableCaptures.length > 0) {
+      // Se forceCapture è attivo, seleziona solo se questo pezzo può catturare
+      if (forceCapture && availableCaptures.length > 0) {
         const capForPiece = availableCaptures.filter(cap => cap.fromR === r && cap.fromC === c);
         if (capForPiece.length === 0) {
           console.log("Devi catturare: questa pedina non può");
@@ -256,12 +257,11 @@ function onSquareClick(board, turn, r, c) {
       console.log("Cella vuota o non è una tua pedina");
     }
   } else {
-    const fromR = selectedCell.r;
-    const fromC = selectedCell.c;
+    const fromR = selectedCell.r, fromC = selectedCell.c;
     const currentPiece = board[fromR][fromC];
-    // Se ci sono catture e la mossa non è di cattura, rifiuta
     const isCap = isThisMoveACapture(board, currentPiece, fromR, fromC, r, c);
-    if (availableCaptures.length > 0 && !isCap) {
+    // Se forceCapture è attivo e c'è almeno una cattura disponibile, ma questa mossa non è cattura, rifiuta la mossa
+    if (forceCapture && availableCaptures.length > 0 && !isCap) {
       console.log("Mossa rifiutata: devi catturare");
       return;
     }
@@ -270,12 +270,12 @@ function onSquareClick(board, turn, r, c) {
       console.log("Mossa rifiutata:", moveResult.reason);
       return;
     }
-    // Se la mossa è una cattura, controlla cattura multipla
+    // Se la mossa è una cattura, controlla la cattura multipla
     if (isCap) {
       const extraCaps = findCapturesForPiece(board, r, c);
       if (extraCaps.length > 0) {
         selectedCell = { r, c };
-        updateBoardOnFirebase(board, turn, true);
+        updateBoardOnFirebase(board, turn, true); // non cambio turno
         renderBoard(board, turn);
         console.log("Cattura multipla: continua a catturare");
         return;
@@ -299,7 +299,7 @@ function tryMove(board, fromR, fromC, toR, toC) {
   const isRed = pieceVal.startsWith('red');
   const isKing = pieceVal.endsWith('K');
   
-  // Movimento semplice: un passo diagonale
+  // Movimento semplice: 1 casella in diagonale
   if (Math.abs(dr) === 1 && Math.abs(dc) === 1) {
     if (!isKing) {
       if (isRed && dr !== -1)
@@ -313,7 +313,7 @@ function tryMove(board, fromR, fromC, toR, toC) {
     return { success: true };
   }
   
-  // Cattura: due passi diagonali
+  // Cattura: 2 caselle in diagonale
   if (Math.abs(dr) === 2 && Math.abs(dc) === 2) {
     const midR = fromR + dr/2, midC = fromC + dc/2;
     const enemy = board[midR][midC];
@@ -327,11 +327,12 @@ function tryMove(board, fromR, fromC, toR, toC) {
     doPromotionIfNeeded(board, toR, toC);
     return { success: true };
   }
+  
   return { success: false, reason: "Mossa non valida: deve essere 1 o 2 caselle in diagonale" };
 }
 
 /****************************************************************
- * 11) doPromotionIfNeeded: promuove a re se si raggiunge l'ultima riga
+ * 11) doPromotionIfNeeded: promuove la pedina a re se raggiunge l'ultima riga
  ****************************************************************/
 function doPromotionIfNeeded(board, r, c) {
   const pieceVal = board[r][c];
@@ -343,7 +344,7 @@ function doPromotionIfNeeded(board, r, c) {
 }
 
 /****************************************************************
- * 12) findAllCaptures: ricerca su tutta la board catture per il colore
+ * 12) findAllCaptures: ritorna tutte le catture disponibili per il colore in turno
  ****************************************************************/
 function findAllCaptures(board, color) {
   const caps = [];
@@ -360,12 +361,12 @@ function findAllCaptures(board, color) {
 }
 
 /****************************************************************
- * 13) findCapturesForPiece: ricerca catture per la pedina in (r,c)
+ * 13) findCapturesForPiece: ritorna le catture disponibili per il pezzo in (r,c)
  ****************************************************************/
 function findCapturesForPiece(board, r, c) {
   const piece = board[r][c];
   if (!piece) return [];
-  const directions = [[-2,-2], [-2,2], [2,-2], [2,2]];
+  const directions = [[-2,-2],[-2,2],[2,-2],[2,2]];
   const caps = [];
   directions.forEach(([dr, dc]) => {
     const newR = r + dr, newC = c + dc;
@@ -390,8 +391,8 @@ function isThisMoveACapture(board, piece, fromR, fromC, toR, toC) {
 }
 
 /****************************************************************
- * 15) updateBoardOnFirebase: salva la board e gestisce il turno
- *    Se sameTurn=true (cattura multipla), il turno rimane invariato
+ * 15) updateBoardOnFirebase: salva la board e passa il turno
+ *    Se sameTurn = true (cattura multipla), il turno rimane invariato
  ****************************************************************/
 function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
   const ref = firebase.database().ref(`games/${currentGameId}`);
