@@ -1,8 +1,91 @@
 
 let nickname = '';
 let playerColor = '';
-let gameRef = null;
 let currentGameId = '';
+let userRef = null;
+
+// Firebase paths
+const usersRef = firebase.database().ref('users');
+const gamesRef = firebase.database().ref('games');
+
+function init() {
+  nickname = prompt("Inserisci il tuo nome") || "Guest" + Math.floor(Math.random() * 1000);
+  userRef = usersRef.push({ name: nickname, status: "online" });
+  userRef.onDisconnect().remove();
+  listenForUsers();
+  renderLobby();
+}
+
+function listenForUsers() {
+  usersRef.on("value", (snapshot) => {
+    const userList = document.getElementById("user-list");
+    userList.innerHTML = "";
+    snapshot.forEach((child) => {
+      const user = child.val();
+      const li = document.createElement("li");
+      li.textContent = user.name + (user.status === "online" ? " 🟢" : " 🔴");
+      if (user.name !== nickname && user.status === "online") {
+        const btn = document.createElement("button");
+        btn.textContent = "Sfida";
+        btn.onclick = () => sendChallenge(child.key);
+        li.appendChild(btn);
+      }
+      userList.appendChild(li);
+    });
+  });
+}
+
+function sendChallenge(targetId) {
+  usersRef.child(targetId).child("invite").set({
+    from: nickname,
+    id: userRef.key
+  });
+}
+
+function renderLobby() {
+  const container = document.getElementById("board");
+  container.innerHTML = `
+    <h3>Ciao, ${nickname}</h3>
+    <h4>Utenti online:</h4>
+    <ul id="user-list"></ul>
+  `;
+}
+
+// Ascolta inviti in arrivo
+usersRef.on("child_changed", (snapshot) => {
+  const data = snapshot.val();
+  if (data.invite && data.name === nickname) {
+    const accept = confirm(`${data.invite.from} ti ha sfidato a una partita. Accetti?`);
+    if (accept) {
+      startGameWith(data.invite.id, snapshot.key);
+    } else {
+      usersRef.child(snapshot.key).child("invite").remove();
+    }
+  }
+});
+
+function startGameWith(opponentId, selfId) {
+  const gameId = Math.random().toString(36).substr(2, 5);
+  currentGameId = gameId;
+  playerColor = 'black';
+
+  gamesRef.child(gameId).set({
+    board: createInitialBoard(),
+    turn: 'red',
+    players: {
+      red: opponentId,
+      black: selfId
+    }
+  });
+
+  // Rimuovi inviti
+  usersRef.child(selfId).child("invite").remove();
+  usersRef.child(opponentId).child("invite").remove();
+
+  // Avvia la partita
+  document.getElementById("status").textContent = "Partita iniziata!";
+  listenToGame(gameId);
+}
 
 function createInitialBoard() {
   const board = [];
@@ -22,46 +105,17 @@ function createInitialBoard() {
   return board;
 }
 
-function createGame() {
-  nickname = document.getElementById('nickname').value || 'Player';
-  const gameId = Math.random().toString(36).substr(2, 5);
-  playerColor = 'red';
-  document.getElementById('status').textContent = 'Partita creata. Codice: ' + gameId;
-
-  const board = createInitialBoard();
-
-  gameRef = firebase.database().ref('games/' + gameId);
-  gameRef.set({ board: board, turn: 'red', players: { red: nickname } });
-
-  currentGameId = gameId;
-  listenToGame(gameId);
-}
-
-function joinGame() {
-  nickname = document.getElementById('nickname').value || 'Player';
-  const gameId = document.getElementById('roomId').value;
-  playerColor = 'black';
-  document.getElementById('status').textContent = 'Sei entrato nella partita: ' + gameId;
-
-  gameRef = firebase.database().ref('games/' + gameId + '/players');
-  gameRef.update({ black: nickname });
-
-  currentGameId = gameId;
-  listenToGame(gameId);
-}
-
 function listenToGame(gameId) {
   const ref = firebase.database().ref('games/' + gameId);
   ref.on('value', snapshot => {
     const data = snapshot.val();
     if (data) {
-      document.getElementById('status').textContent = 'Turno: ' + data.turn;
-      renderBoard(data.board || [], gameId, data.turn);
+      renderBoard(data.board || []);
     }
   });
 }
 
-function renderBoard(board, gameId, turn) {
+function renderBoard(board) {
   const container = document.getElementById('board');
   container.innerHTML = '';
   for (let r = 0; r < 8; r++) {
@@ -77,52 +131,10 @@ function renderBoard(board, gameId, turn) {
         square.appendChild(piece);
       }
 
-      square.addEventListener('click', () => handleClick(r, c, board, gameId, turn));
       container.appendChild(square);
     }
   }
 }
 
-let selected = null;
-
-function handleClick(r, c, board, gameId, turn) {
-  if (turn !== playerColor) return;
-
-  if (selected) {
-    const [sr, sc] = selected;
-    const dr = r - sr;
-    const dc = c - sc;
-
-    if (Math.abs(dr) === 1 && Math.abs(dc) === 1 && !board[r][c]) {
-      board[r][c] = board[sr][sc];
-      board[sr][sc] = '';
-      updateBoard(gameId, board);
-      switchTurn(gameId, turn);
-      selected = null;
-    } else if (Math.abs(dr) === 2 && Math.abs(dc) === 2) {
-      const mr = sr + dr / 2;
-      const mc = sc + dc / 2;
-      if (board[mr][mc] && board[mr][mc] !== board[sr][sc] && !board[r][c]) {
-        board[r][c] = board[sr][sc];
-        board[sr][sc] = '';
-        board[mr][mc] = '';
-        updateBoard(gameId, board);
-        switchTurn(gameId, turn);
-        selected = null;
-      }
-    } else {
-      selected = null;
-    }
-  } else if (board[r][c] === playerColor) {
-    selected = [r, c];
-  }
-}
-
-function updateBoard(gameId, board) {
-  firebase.database().ref('games/' + gameId + '/board').set(board);
-}
-
-function switchTurn(gameId, currentTurn) {
-  const nextTurn = currentTurn === 'red' ? 'black' : 'red';
-  firebase.database().ref('games/' + gameId + '/turn').set(nextTurn);
-}
+// Avvia
+window.onload = init;
