@@ -29,6 +29,12 @@ h1 {
   background-color: #444;
 }
 
+/* Evidenziazione della casella selezionata */
+.selected {
+  outline: 2px solid yellow;
+  box-sizing: border-box;
+}
+
 /* Pedine */
 .piece {
   border-radius: 50%;
@@ -41,6 +47,16 @@ h1 {
 }
 .piece.black {
   background-color: #f5e3b3;
+}
+
+/* Dama (king): bordo d'oro per distinguerla */
+.piece.redK {
+  background-color: red;
+  border: 2px solid gold;
+}
+.piece.blackK {
+  background-color: #f5e3b3;
+  border: 2px solid gold;
 }
 
 /* Lista utenti */
