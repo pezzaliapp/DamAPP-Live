@@ -29,13 +29,14 @@ h1 {
   background-color: #444;
 }
 
-/* Evidenziazione della casella selezionata */
+/* Evidenziazione della cella selezionata */
 .selected {
   outline: 2px solid yellow;
   box-sizing: border-box;
 }
 
-/* Pedine normali e dame */
+/* Pedine normali e re */
+/* Per "red" usiamo il rosso; per "panna", un colore crema */
 .piece {
   border-radius: 50%;
   width: 40px;
@@ -45,14 +46,14 @@ h1 {
 .piece.red {
   background-color: red;
 }
-.piece.black {
+.piece.panna {
   background-color: #f5e3b3;
 }
 .piece.redK {
   background-color: red;
   border: 2px solid gold;
 }
-.piece.blackK {
+.piece.pannaK {
   background-color: #f5e3b3;
   border: 2px solid gold;
 }
