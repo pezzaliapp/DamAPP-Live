@@ -7,20 +7,25 @@ let userRef = null;
 const usersRef = firebase.database().ref('users');
 const gamesRef = firebase.database().ref('games');
 
-
 function init() {
-  // ...
-  firebase.database().ref('users').on('child_changed', (snapshot) => {
-    const data = snapshot.val();
-    if (snapshot.key === userRef.key && data.gameId) {
-      currentGameId = data.gameId;
-      listenToGame(currentGameId);
-      firebase.database().ref('users/' + snapshot.key + '/gameId').remove();
-    }
-  });
-
   nickname = prompt("Inserisci il tuo nome") || "Guest" + Math.floor(Math.random() * 1000);
-  userRef = usersRef.push({ name: nickname, status: "online" });
+  
+
+userRef = usersRef.push({ name: nickname, status: "online", lastActive: Date.now(), inGame: false });
+userRef.onDisconnect().remove();
+
+// Aggiorna lastActive ogni 30 secondi
+setInterval(() => {
+  userRef.update({ lastActive: Date.now() });
+}, 30000);
+
+userRef.onDisconnect().remove();
+
+// Aggiorna lastActive ogni 30 secondi
+setInterval(() => {
+  userRef.update({ lastActive: Date.now() });
+}, 30000);
+
   userRef.onDisconnect().remove();
   listenForUsers();
   renderLobby();
@@ -31,7 +36,14 @@ function listenForUsers() {
     const userList = document.getElementById("board");
     userList.innerHTML = "<h3>Ciao, " + nickname + "</h3><h4>Utenti online:</h4><ul id='user-list'></ul>";
     const ul = document.getElementById("user-list");
-    snapshot.forEach((child) => {
+    
+const now = Date.now();
+snapshot.forEach((child) => {
+  const user = child.val();
+  
+if (!user.lastActive || now - user.lastActive > 60000 || user.inGame) return;
+ // ignora utenti inattivi da >60s
+
       const user = child.val();
       const li = document.createElement("li");
       li.textContent = user.name + " 🟢";
@@ -58,7 +70,11 @@ usersRef.on("child_changed", (snapshot) => {
   if (data.invite && data.name === nickname) {
     const accept = confirm(data.invite.from + " ti ha sfidato. Accetti?");
     if (accept) {
-      startGameWith(data.invite.id, snapshot.key);
+      
+usersRef.child(snapshot.key).update({ inGame: true });
+usersRef.child(data.invite.id).update({ inGame: true });
+startGameWith(data.invite.id, snapshot.key);
+
     } else {
       usersRef.child(snapshot.key).child("invite").remove();
     }
@@ -70,11 +86,7 @@ function startGameWith(opponentId, selfId) {
   currentGameId = gameId;
   playerColor = 'black';
 
-  
-gamesRef.child(gameId).set({
-    notifyRed: opponentId,
-    notifyBlack: selfId,
-
+  gamesRef.child(gameId).set({
     board: createInitialBoard(),
     turn: 'red',
     players: {
@@ -88,9 +100,8 @@ gamesRef.child(gameId).set({
 
   document.getElementById("status").textContent = "Partita iniziata!";
   
-firebase.database().ref('users/' + opponentId + '/gameId').set(gameId);
-firebase.database().ref('users/' + selfId + '/gameId').set(gameId);
 listenToGame(gameId);
+checkOpponentStatus(gameId);
 
 }
 
@@ -141,3 +152,17 @@ function renderBoard(board) {
 }
 
 window.onload = init;
+
+
+function checkOpponentStatus(gameId) {
+  firebase.database().ref('games/' + gameId + '/players').once('value').then(snapshot => {
+    const players = snapshot.val();
+    const opponentKey = playerColor === 'red' ? players.black : players.red;
+    firebase.database().ref('users/' + opponentKey).on('value', snap => {
+      const val = snap.val();
+      if (!val) {
+        document.getElementById('status').textContent = "⚠️ Il tuo avversario si è disconnesso.";
+      }
+    });
+  });
+}
