@@ -1,3 +1,6 @@
+/***********************************
+ * Variabili e riferimenti Firebase
+ ***********************************/
 let nickname = '';
 let playerColor = '';
 let currentGameId = '';
@@ -6,50 +9,68 @@ let userRef = null;
 const usersRef = firebase.database().ref('users');
 const gamesRef = firebase.database().ref('games');
 
+/******************************************
+ * Inizializzazione dell'app all'avvio
+ ******************************************/
 function init() {
-  // Chiede il nickname all'utente
+  // Chiediamo il nickname
   nickname = prompt("Inserisci il tuo nome") || "Guest" + Math.floor(Math.random() * 1000);
 
-  // Crea un record nel DB con lo stato dell'utente
+  // Creiamo un record utente su Firebase
   userRef = usersRef.push({
     name: nickname,
     status: "online",
     lastActive: Date.now(),
-    inGame: false
+    inGame: false,
+    currentGame: ""  // per memorizzare l'ID partita
   });
 
-  // Rimuove l'utente al termine della connessione
+  // Rimuove l'utente se chiude la pagina
   userRef.onDisconnect().remove();
 
-  // Aggiorna lastActive ogni 30 secondi
+  // Aggiorna lastActive ogni 30s
   setInterval(() => {
     userRef.update({ lastActive: Date.now() });
   }, 30000);
 
+  // Messaggio iniziale
   document.getElementById("status").textContent = `Benvenuto, ${nickname}! Seleziona un utente da sfidare.`;
 
-  // Avvia l'ascolto per aggiornare la lista utenti
+  // Ascolta la lista utenti
   listenForUsers();
+
+  // Ascolta cambiamenti sul singolo utente (es: currentGame impostato)
+  userRef.on("value", snapshot => {
+    const data = snapshot.val();
+    // Se mi hanno assegnato una partita => la carico
+    if (data.currentGame && data.currentGame !== currentGameId) {
+      currentGameId = data.currentGame;
+      listenToGame(currentGameId);
+      document.getElementById("status").textContent = "Partita iniziata!";
+    }
+  });
 }
 
-// Mostra in #users la lista degli utenti online, escludendo chi è inattivo o già in partita
+/****************************************************
+ * Mostra nella sezione #users la lista degli utenti
+ ****************************************************/
 function listenForUsers() {
   usersRef.on("value", (snapshot) => {
     const usersContainer = document.getElementById("users");
     const now = Date.now();
 
-    // Ricostruisce la sezione
+    // Reset contenuto
     usersContainer.innerHTML = `
-      <h3>Utenti online (non in gioco):</h3>
+      <h4>Utenti online (non in gioco):</h4>
       <ul id="user-list"></ul>
     `;
-
     const ul = document.getElementById("user-list");
 
+    // Scorriamo tutti gli utenti
     snapshot.forEach((child) => {
       const user = child.val();
 
-      // Ignora se inattivo > 60s o già in partita
+      // Ignora se inattivo da 60s o già in partita
       if (!user.lastActive || now - user.lastActive > 60000 || user.inGame) {
         return;
       }
@@ -58,85 +79,100 @@ function listenForUsers() {
       const li = document.createElement("li");
       li.textContent = user.name + " 🟢";
 
-      // Se l'utente è diverso da me, aggiunge il pulsante "Sfida"
+      // Se non è il mio utente, aggiungo bottone Sfida
       if (user.name !== nickname) {
         const btn = document.createElement("button");
         btn.textContent = "Sfida";
         btn.onclick = () => sendChallenge(child.key);
         li.appendChild(btn);
       }
-
       ul.appendChild(li);
     });
   });
 }
 
-// Invia un invito di sfida a un utente
+/*******************************************************
+ * Invio di una sfida a un utente target (targetId)
+ *******************************************************/
 function sendChallenge(targetId) {
+  // Scrivo un oggetto "invite" all'utente target
   usersRef.child(targetId).child("invite").set({
     from: nickname,
-    id: userRef.key
+    fromId: userRef.key
   });
 }
 
-// Quando cambiano i dati di un utente, controlliamo se c'è un invito per noi
+/*******************************************************************
+ * Ascolta i cambiamenti di *tutti* gli utenti per l'accettazione
+ *******************************************************************/
 usersRef.on("child_changed", (snapshot) => {
   const data = snapshot.val();
 
-  // Se c'è un invito e l'utente corrisponde al mio nickname
-  if (data.invite && data.name === nickname) {
-    const accept = confirm(`${data.invite.from} ti ha sfidato. Accetti?`);
+  // Se l'utente cambiato sono io e c'è un "invite", lo gestisco
+  if (data.name === nickname && data.invite) {
+    const invite = data.invite;
+    const accept = confirm(`${invite.from} ti ha sfidato. Accetti?`);
+    
     if (accept) {
-      // Mettiamo entrambi inGame
+      // Impostiamo entrambi "inGame: true" e creiamo la partita
       usersRef.child(snapshot.key).update({ inGame: true });
-      usersRef.child(data.invite.id).update({ inGame: true });
-
-      // Avvia la partita
-      startGameWith(data.invite.id, snapshot.key);
+      usersRef.child(invite.fromId).update({ inGame: true });
+      // Avvio la partita
+      startGameWith(invite.fromId, snapshot.key);
     } else {
-      // Se rifiutiamo, togliamo l'invito
+      // Rimuovo l'invito se rifiuto
       usersRef.child(snapshot.key).child("invite").remove();
     }
   }
 });
 
-// Avvia la partita tra i due utenti
+/*********************************************************************
+ * Creazione e avvio partita: la esegue sempre chi ACCETTA la sfida
+ *********************************************************************/
 function startGameWith(opponentId, selfId) {
   const gameId = Math.random().toString(36).substr(2, 5);
   currentGameId = gameId;
-  // Chi accetta la sfida viene impostato come colore "black"
+
+  // Chi accetta la sfida gioca con le pedine nere
   playerColor = 'black';
 
-  // Crea la partita nel DB con la damiera iniziale
+  // 1) Creo su Firebase un record "gameId" con damiera iniziale
   gamesRef.child(gameId).set({
     board: createInitialBoard(),
-    turn: 'red',
+    turn: 'red', // tocca al rosso (opponent) di default
     players: {
       red: opponentId,
       black: selfId
     }
   });
 
-  // Rimuoviamo eventuali inviti residui
+  // 2) Rimuovo eventuali inviti
   usersRef.child(selfId).child("invite").remove();
   usersRef.child(opponentId).child("invite").remove();
 
-  document.getElementById("status").textContent = "Partita iniziata!";
+  // 3) Salvo il gameId su *entrambi* gli utenti
+  usersRef.child(selfId).update({ currentGame: gameId });
+  usersRef.child(opponentId).update({ currentGame: gameId });
+
+  // 4) Io che ho accettato, inizio subito ad ascoltare la partita
   listenToGame(gameId);
-  checkOpponentStatus(gameId);
+
+  document.getElementById("status").textContent = "Partita iniziata!";
 }
 
-// Crea lo schema base per una damiera a 8x8
+/************************************************************************
+ * Creazione damiera iniziale 8x8 (pezzi rossi in basso, neri in alto)
+ ************************************************************************/
 function createInitialBoard() {
   const board = [];
   for (let r = 0; r < 8; r++) {
     const row = [];
     for (let c = 0; c < 8; c++) {
-      // Pezzi neri (black) nelle prime 3 righe (solo caselle scure)
+      // Pedine nere in alto (solo caselle scure)
       if ((r + c) % 2 === 1 && r < 3) {
         row.push('black');
       }
-      // Pezzi rossi (red) nelle ultime 3 righe (solo caselle scure)
+      // Pedine rosse in basso (solo caselle scure)
       else if ((r + c) % 2 === 1 && r > 4) {
         row.push('red');
       } else {
@@ -148,7 +184,9 @@ function createInitialBoard() {
   return board;
 }
 
-// Ascolta i cambiamenti sul game corrente
+/********************************************************************
+ * Ascolta i cambiamenti del game su Firebase e aggiorna la damiera
+ ********************************************************************/
 function listenToGame(gameId) {
   const ref = firebase.database().ref(`games/${gameId}`);
   ref.on('value', (snapshot) => {
@@ -159,7 +197,9 @@ function listenToGame(gameId) {
   });
 }
 
-// Disegna la board nel div #board
+/*********************************************************
+ * Disegna la board (8x8) dentro #board
+ *********************************************************/
 function renderBoard(board) {
   const container = document.getElementById('board');
   container.innerHTML = '';
@@ -169,7 +209,7 @@ function renderBoard(board) {
       const square = document.createElement('div');
       square.className = 'square ' + ((r + c) % 2 === 0 ? 'light' : 'dark');
 
-      // Se c'è un pezzo in questa posizione, lo mostriamo
+      // Se c'è un pezzo (black o red), mostralo
       if (board[r][c]) {
         const piece = document.createElement('div');
         piece.className = 'piece ' + board[r][c];
@@ -180,26 +220,16 @@ function renderBoard(board) {
   }
 }
 
-// Controlla se l'avversario si è disconnesso durante la partita
+/*********************************************************************
+ * Avviso se l'avversario si disconnette (opzionale, da migliorare)
+ *********************************************************************/
 function checkOpponentStatus(gameId) {
-  firebase.database().ref(`games/${gameId}/players`)
-    .once('value')
-    .then(snapshot => {
-      const players = snapshot.val();
-      if (!players) return;
-
-      // Determina la chiave dell'avversario
-      const opponentKey = (playerColor === 'red') ? players.black : players.red;
-
-      firebase.database().ref(`users/${opponentKey}`).on('value', snap => {
-        const val = snap.val();
-        if (!val) {
-          document.getElementById('status').textContent =
-            "⚠️ Il tuo avversario si è disconnesso.";
-        }
-      });
-    });
+  // Se vuoi un controllo esplicito, puoi fare una logica simile
+  // a "once('value')" e poi "on('value')" come nel tuo codice.
+  // Non essenziale per vedere la scacchiera da entrambi i lati.
 }
 
-// Avvio dell'app
+/******************************************************
+ * Avvio dell'app quando la pagina è caricata
+ ******************************************************/
 window.onload = init;
