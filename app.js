@@ -2,11 +2,12 @@
  * Riferimenti Firebase & Variabili
  ***************************************/
 let nickname = '';
-let playerColor = ''; // "red" o "black"
+let playerColor = ''; // verrà "red" oppure "panna"
 let currentGameId = '';
 let userRef = null;
 
-let selectedCell = null; // {r, c} se un pezzo è selezionato
+// Variabile per gestire la selezione del pezzo
+let selectedCell = null; // {r, c} oppure null
 
 const usersRef = firebase.database().ref('users');
 const gamesRef = firebase.database().ref('games');
@@ -16,7 +17,7 @@ const gamesRef = firebase.database().ref('games');
  **************************************************/
 function init() {
   nickname = prompt("Inserisci il tuo nome") || "Guest" + Math.floor(Math.random() * 1000);
-
+  
   userRef = usersRef.push({
     name: nickname,
     status: "online",
@@ -26,24 +27,24 @@ function init() {
   });
 
   userRef.onDisconnect().remove();
-  
-  // Aggiorna lastActive ogni 30s
+
+  // Aggiorna lastActive ogni 30 secondi
   setInterval(() => {
     userRef.update({ lastActive: Date.now() });
   }, 30000);
 
-  console.log(`Benvenuto ${nickname}. Attendi o sfida qualcuno...`);
   document.getElementById("status").textContent =
     `Benvenuto, ${nickname}! Seleziona un utente da sfidare.`;
+  console.log(`Benvenuto ${nickname}`);
 
   listenForUsers();
 
-  // Se ho currentGame nel mio record, lo carico
+  // Se il record utente viene aggiornato con un "currentGame", carico la partita
   userRef.on("value", snapshot => {
     const data = snapshot.val();
     if (data.currentGame && data.currentGame !== currentGameId) {
       currentGameId = data.currentGame;
-      console.log("Carico la partita esistente: ", currentGameId);
+      console.log("Partita esistente trovata, ID:", currentGameId);
       listenToGame(currentGameId);
       document.getElementById("status").textContent = "Partita iniziata!";
     }
@@ -51,7 +52,7 @@ function init() {
 }
 
 /****************************************************
- * 2) Mostra l'elenco utenti online (non in partita)
+ * 2) Visualizza utenti online (non in gioco)
  ****************************************************/
 function listenForUsers() {
   usersRef.on("value", (snapshot) => {
@@ -66,11 +67,8 @@ function listenForUsers() {
 
     snapshot.forEach((child) => {
       const user = child.val();
-
-      // Ignoro se inattivo da 60s o inGame
-      if (!user.lastActive || now - user.lastActive > 60000 || user.inGame) {
+      if (!user.lastActive || now - user.lastActive > 60000 || user.inGame)
         return;
-      }
 
       const li = document.createElement("li");
       li.textContent = user.name + " 🟢";
@@ -86,10 +84,10 @@ function listenForUsers() {
 }
 
 /*********************************************
- * 3) Invia sfida a un altro utente (io = rosso)
+ * 3) Invia sfida a un altro utente
  *********************************************/
 function sendChallenge(targetId) {
-  console.log("Invio sfida a utente con key:", targetId);
+  console.log(`Invio sfida a utente con key ${targetId}`);
   usersRef.child(targetId).child("invite").set({
     from: nickname,
     fromId: userRef.key
@@ -97,21 +95,21 @@ function sendChallenge(targetId) {
 }
 
 /****************************************************************
- * 4) Ascolta i cambiamenti di *tutti* gli utenti per sfida
+ * 4) Ascolta le modifiche (inviti) per ricevere sfide
  ****************************************************************/
 usersRef.on("child_changed", (snapshot) => {
   const data = snapshot.val();
   if (data.name === nickname && data.invite) {
     const invite = data.invite;
-    console.log(`Ho ricevuto un invito da ${invite.from}`);
+    console.log(`Ricevuto invito da ${invite.from}`);
     const accept = confirm(`${invite.from} ti ha sfidato. Accetti?`);
     if (accept) {
-      console.log("Accetto sfida da:", invite.from);
+      console.log(`Accetto la sfida da ${invite.from}`);
       usersRef.child(snapshot.key).update({ inGame: true });
       usersRef.child(invite.fromId).update({ inGame: true });
       startGameWith(invite.fromId, snapshot.key);
     } else {
-      console.log("Rifiuto sfida da:", invite.from);
+      console.log(`Rifiuto la sfida da ${invite.from}`);
       usersRef.child(snapshot.key).child("invite").remove();
     }
   }
@@ -119,26 +117,25 @@ usersRef.on("child_changed", (snapshot) => {
 
 /*************************************************
  * 5) startGameWith: crea la partita su Firebase
+ *    Assegna: challenger (inviante) = RED, chi accetta = PANNA
  *************************************************/
 function startGameWith(opponentId, selfId) {
   const gameId = Math.random().toString(36).substr(2, 5);
   currentGameId = gameId;
   
-  // Io che accetto => black, Opponent => red
-  playerColor = 'black';
-
-  console.log("Creo partita ID:", gameId, " - Opponent=red:", opponentId, " Me=black:", selfId);
-
+  // Il challenger (inviante) è RED; Io (accettante) sono PANNA.
+  console.log(`Creo partita ${gameId}. Opponent (RED): ${opponentId}, Io (PANNA): ${selfId}`);
+  
   gamesRef.child(gameId).set({
     board: createInitialBoard(),
-    turn: 'red', // inizia rosso
+    turn: 'red', // Il turno iniziale è RED
     players: {
       red: opponentId,
-      black: selfId
+      panna: selfId
     }
   });
 
-  // Pulisco inviti e aggiorno la currentGame
+  // Rimuovo inviti e assegno la partita a entrambi
   usersRef.child(selfId).child("invite").remove();
   usersRef.child(opponentId).child("invite").remove();
   usersRef.child(selfId).update({ currentGame: gameId });
@@ -152,14 +149,17 @@ function startGameWith(opponentId, selfId) {
  * 6) Creazione damiera iniziale (8x8)
  *******************************************************/
 function createInitialBoard() {
-  // "", "red", "black", "redK", "blackK"
+  // Valori possibili: "", "red", "panna", "redK", "pannaK"
   const board = [];
   for (let r = 0; r < 8; r++) {
     const row = [];
     for (let c = 0; c < 8; c++) {
+      // Le tre righe superiori contengono le pedine "panna"
       if ((r + c) % 2 === 1 && r < 3) {
-        row.push('black');
-      } else if ((r + c) % 2 === 1 && r > 4) {
+        row.push('panna');
+      }
+      // Le tre righe inferiori contengono le pedine "red"
+      else if ((r + c) % 2 === 1 && r > 4) {
         row.push('red');
       } else {
         row.push('');
@@ -171,164 +171,151 @@ function createInitialBoard() {
 }
 
 /*********************************************************************
- * 7) Ascolta i cambiamenti del game su Firebase, aggiorna board/turn
+ * 7) Ascolta i cambiamenti della partita e assegna il colore
  *********************************************************************/
 function listenToGame(gameId) {
   const ref = firebase.database().ref(`games/${gameId}`);
   ref.on('value', (snapshot) => {
     const data = snapshot.val();
     if (data && data.board) {
-      console.log("Aggiornamento partita:", data);
+      // Determina il colore locale confrontando con il record della partita
+      if (data.players.red === userRef.key) {
+        playerColor = 'red';
+      } else if (data.players.panna === userRef.key) {
+        playerColor = 'panna';
+      }
+      console.log(`Assegnato playerColor: ${playerColor} per l'utente ${userRef.key}`);
       renderBoard(data.board, data.turn);
     }
   });
 }
 
 /**************************************************************
- * 8) renderBoard
+ * 8) renderBoard: disegna la damiera e inverte le righe per "panna"
  **************************************************************/
 function renderBoard(board, turn) {
-  console.log("renderBoard() - Turno di:", turn, " - Io sono:", playerColor);
+  console.log(`renderBoard: Turno di ${turn}. Io sono ${playerColor}`);
   const container = document.getElementById('board');
   container.innerHTML = '';
 
+  // Aggiorna lo status con il turno corrente
   if (turn) {
     document.getElementById('status').textContent = `Turno di ${turn.toUpperCase()}`;
   }
-
-  for (let r = 0; r < 8; r++) {
-    for (let c = 0; c < 8; c++) {
+  
+  // Se il giocatore è "panna", inverto l'ordine delle righe
+  let rowIndices = [];
+  if (playerColor === 'panna') {
+    for (let r = board.length - 1; r >= 0; r--) {
+      rowIndices.push(r);
+    }
+  } else {
+    for (let r = 0; r < board.length; r++) {
+      rowIndices.push(r);
+    }
+  }
+  
+  // Disegna le righe secondo l'orientamento calcolato
+  rowIndices.forEach(r => {
+    for (let c = 0; c < board[r].length; c++) {
       const square = document.createElement('div');
-      square.className = 'square ' + ((r + c) % 2 === 0 ? 'light' : 'dark');
+      square.className = 'square ' + (((r + c) % 2 === 0) ? 'light' : 'dark');
       
-      // Se è la cella selezionata, la evidenzio
       if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
         square.classList.add('selected');
       }
-
+      
       const pieceVal = board[r][c];
       if (pieceVal) {
         const piece = document.createElement('div');
-        piece.className = 'piece ' + pieceVal;
+        piece.className = 'piece ' + pieceVal;  // Ci aspettiamo "red", "panna", "redK", "pannaK"
         square.appendChild(piece);
       }
-
+      
+      // Associamo l'evento click mantenendo le coordinate interne
       square.onclick = () => onSquareClick(board, turn, r, c);
       container.appendChild(square);
     }
-  }
+  });
 }
 
 /***************************************************************
- * 9) onSquareClick: mossa libera (senza obbligo di cattura)
- *    - Se non è il mio turno, ignoro
- *    - Se non ho selezionato un pezzo, seleziono
- *    - Se ho selezionato un pezzo, tento mossa (passo o cattura)
+ * 9) onSquareClick: gestione dei click per selezionare e muovere
  ***************************************************************/
 function onSquareClick(board, turn, r, c) {
-  console.log(`Cliccato su cella (${r}, ${c}). Turno di ${turn}, Io sono ${playerColor}`);
-
-  // Se non è il mio turno
+  console.log(`Cliccato su cella (${r},${c}). Turno: ${turn} – Io: ${playerColor}`);
   if (turn !== playerColor) {
-    console.log("Mossa rifiutata: Non è il mio turno");
+    console.log("Non è il mio turno");
     return;
   }
-
-  // Se non ho selezionato nessuna pedina
+  
   if (!selectedCell) {
     const pieceVal = board[r][c];
     if (pieceVal && pieceVal.startsWith(turn)) {
-      // Seleziono la pedina
       selectedCell = { r, c };
-      console.log("Ho selezionato la pedina in", selectedCell);
+      console.log(`Selezionata pedina in (${r},${c})`);
       renderBoard(board, turn);
     } else {
-      console.log("Mossa rifiutata: questa cella non contiene una mia pedina");
+      console.log("Cella vuota o non è la mia pedina");
     }
-  }
-  // Se ho già selezionato un pezzo, provo a muovere
-  else {
+  } else {
     const fromR = selectedCell.r;
     const fromC = selectedCell.c;
     const moveResult = tryMove(board, fromR, fromC, r, c);
-
     if (!moveResult.success) {
       console.log("Mossa rifiutata:", moveResult.reason);
       return;
     }
-
-    // Mossa valida => aggiorno su Firebase e passo il turno
     selectedCell = null;
     updateBoardOnFirebase(board, turn);
   }
 }
 
 /********************************************************************
- * 10) tryMove: controlla validità (o cattura) e aggiorna "board"
+ * 10) tryMove: controlla se la mossa è valida (passo o cattura)
  ********************************************************************/
 function tryMove(board, fromR, fromC, toR, toC) {
-  // La destinazione dev'essere vuota
   if (board[toR][toC] !== '') {
     return { success: false, reason: "La destinazione non è vuota" };
   }
 
   const pieceVal = board[fromR][fromC];
-  if (!pieceVal) {
-    return { success: false, reason: "Nessuna pedina da muovere qui" };
-  }
+  if (!pieceVal) return { success: false, reason: "Nessuna pedina da muovere" };
 
-  // Check se è una mossa semplice di 1 in diagonale
   const dr = toR - fromR;
   const dc = toC - fromC;
-
-  // Se pedina non è re, deve muoversi di ±1 solo in avanti (rosso su, nero giù)
   const isRed = pieceVal.startsWith('red');
   const isKing = pieceVal.endsWith('K');
 
-  // Provo prima la mossa di 1
+  // Mossa semplice: 1 casella in diagonale
   if (Math.abs(dr) === 1 && Math.abs(dc) === 1) {
-    // Se non è un re, controllo direzione
     if (!isKing) {
-      if (isRed && dr !== -1) {
-        return { success: false, reason: "Pedina rossa normale si muove solo in su di 1" };
-      }
-      if (!isRed && dr !== 1) {
-        return { success: false, reason: "Pedina nera normale si muove solo in giù di 1" };
-      }
+      if (isRed && dr !== -1)
+        return { success: false, reason: "La pedina rossa si muove solo in su di 1" };
+      if (!isRed && dr !== 1)
+        return { success: false, reason: "La pedina panna si muove solo in giù di 1" };
     }
-
-    // OK => sposto
     board[toR][toC] = pieceVal;
     board[fromR][fromC] = '';
     doPromotionIfNeeded(board, toR, toC);
     return { success: true };
   }
 
-  // Provo la cattura di 2
+  // Cattura: 2 caselle in diagonale
   if (Math.abs(dr) === 2 && Math.abs(dc) === 2) {
-    // Casella intermedia
     const midR = fromR + dr / 2;
     const midC = fromC + dc / 2;
     const enemyPiece = board[midR][midC];
-    if (!enemyPiece) {
-      return { success: false, reason: "Non c'è un pezzo avversario da catturare" };
-    }
-    // Deve essere dell'avversario
-    if (enemyPiece.startsWith(pieceVal.startsWith('red') ? 'red' : 'black')) {
+    if (!enemyPiece)
+      return { success: false, reason: "Non c'è un nemico da catturare" };
+    if (enemyPiece.startsWith(pieceVal.startsWith('red') ? 'red' : 'panna'))
       return { success: false, reason: "Non posso catturare una mia pedina" };
-    }
-
-    // Se non è un re, controllo direzione
     if (!isKing) {
-      if (isRed && dr !== -2) {
-        return { success: false, reason: "Pedina rossa normale cattura solo verso l'alto" };
-      }
-      if (!isRed && dr !== 2) {
-        return { success: false, reason: "Pedina nera normale cattura solo verso il basso" };
-      }
+      if (isRed && dr !== -2)
+        return { success: false, reason: "La pedina rossa cattura solo in su" };
+      if (!isRed && dr !== 2)
+        return { success: false, reason: "La pedina panna cattura solo in giù" };
     }
-
-    // Eseguo cattura
     board[toR][toC] = pieceVal;
     board[fromR][fromC] = '';
     board[midR][midC] = '';
@@ -336,42 +323,38 @@ function tryMove(board, fromR, fromC, toR, toC) {
     return { success: true };
   }
 
-  // Altrimenti non è una mossa valida
-  return { success: false, reason: "Mossa non valida: non è un passo di 1 o 2 in diagonale" };
+  return { success: false, reason: "Mossa non valida: deve essere 1 o 2 caselle in diagonale" };
 }
 
 /****************************************************************
- * 11) doPromotionIfNeeded
+ * 11) doPromotionIfNeeded: promuove in re se si raggiunge la riga finale
  ****************************************************************/
 function doPromotionIfNeeded(board, r, c) {
   const pieceVal = board[r][c];
   if (!pieceVal) return;
   if (pieceVal.endsWith('K')) return;
-
-  // Se rosso arriva a r=0 => redK
   if (pieceVal === 'red' && r === 0) {
     board[r][c] = 'redK';
   }
-  // Se nero arriva a r=7 => blackK
-  if (pieceVal === 'black' && r === 7) {
-    board[r][c] = 'blackK';
+  if (pieceVal === 'panna' && r === 7) {
+    board[r][c] = 'pannaK';
   }
 }
 
 /****************************************************************
- * 12) updateBoardOnFirebase: salvo board, cambio turno
+ * 12) updateBoardOnFirebase: salva la board e passa il turno
  ****************************************************************/
-function updateBoardOnFirebase(localBoard, currentTurn) {
+function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
   const ref = firebase.database().ref(`games/${currentGameId}`);
   ref.once('value').then(snapshot => {
     const data = snapshot.val();
     if (!data) {
-      console.log("ERRORE: nessun game con ID", currentGameId);
+      console.log("Nessuna partita trovata con ID", currentGameId);
       return;
     }
-    const nextTurn = (currentTurn === 'red') ? 'black' : 'red';
-
-    console.log("Aggiorno board su Firebase. Turno passa a:", nextTurn);
+    // Calcolo il turno successivo: se currentTurn è "red", passa a "panna", altrimenti a "red".
+    const nextTurn = sameTurn ? currentTurn : (currentTurn === 'red' ? 'panna' : 'red');
+    console.log("Aggiorno la board. Turno passa a:", nextTurn);
     ref.update({
       board: localBoard,
       turn: nextTurn
