@@ -7,7 +7,18 @@ let userRef = null;
 const usersRef = firebase.database().ref('users');
 const gamesRef = firebase.database().ref('games');
 
+
 function init() {
+  // ...
+  firebase.database().ref('users').on('child_changed', (snapshot) => {
+    const data = snapshot.val();
+    if (snapshot.key === userRef.key && data.gameId) {
+      currentGameId = data.gameId;
+      listenToGame(currentGameId);
+      firebase.database().ref('users/' + snapshot.key + '/gameId').remove();
+    }
+  });
+
   nickname = prompt("Inserisci il tuo nome") || "Guest" + Math.floor(Math.random() * 1000);
   userRef = usersRef.push({ name: nickname, status: "online" });
   userRef.onDisconnect().remove();
@@ -59,7 +70,11 @@ function startGameWith(opponentId, selfId) {
   currentGameId = gameId;
   playerColor = 'black';
 
-  gamesRef.child(gameId).set({
+  
+gamesRef.child(gameId).set({
+    notifyRed: opponentId,
+    notifyBlack: selfId,
+
     board: createInitialBoard(),
     turn: 'red',
     players: {
@@ -72,7 +87,11 @@ function startGameWith(opponentId, selfId) {
   usersRef.child(opponentId).child("invite").remove();
 
   document.getElementById("status").textContent = "Partita iniziata!";
-  listenToGame(gameId);
+  
+firebase.database().ref('users/' + opponentId + '/gameId').set(gameId);
+firebase.database().ref('users/' + selfId + '/gameId').set(gameId);
+listenToGame(gameId);
+
 }
 
 function createInitialBoard() {
