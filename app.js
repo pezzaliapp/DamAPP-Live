@@ -250,6 +250,7 @@ function renderBoard(board, turn) {
       const pieceVal = board[r][c];
       if (pieceVal) {
         const piece = document.createElement('div');
+        // Se il pezzo è "redK" o "pannaK" mantiene il colore originale (red o panna) con un bordo giallo
         piece.className = 'piece ' + pieceVal;
         square.appendChild(piece);
       }
@@ -285,7 +286,6 @@ function onSquareClick(board, turn, r, c) {
   if (!selectedCell) {
     const pieceVal = board[r][c];
     if (pieceVal && pieceVal.startsWith(turn)) {
-      // Se forceCapture è attivo, solo i pezzi in grado di catturare possono essere selezionati
       if (forceCapture && availableCaptures.length > 0) {
         const capForPiece = availableCaptures.filter(cap => cap.fromR === r && cap.fromC === c);
         if (capForPiece.length === 0) {
@@ -319,7 +319,7 @@ function onSquareClick(board, turn, r, c) {
       const extraCaps = findCapturesForPiece(board, r, c);
       if (extraCaps.length > 0) {
         selectedCell = { r, c };
-        updateBoardOnFirebase(board, turn, true); // Turno non cambia
+        updateBoardOnFirebase(board, turn, true); // Il turno rimane lo stesso
         renderBoard(board, turn);
         console.log("Cattura multipla: continua a catturare");
         updateStatus("Cattura multipla: continua a catturare");
@@ -368,14 +368,14 @@ function tryMove(board, fromR, fromC, toR, toC) {
   
   // Cattura: 2 caselle in diagonale
   if (Math.abs(dr) === 2 && Math.abs(dc) === 2) {
-    // Se la pedina non è un re, non può catturare all'indietro:
+    // Per le pedine non re, la cattura può essere solo in avanti.
     if (!isKing) {
       if (isRed && !(toR < fromR))
         return { success: false, reason: "Le pedine red non possono catturare all'indietro" };
       if (!isRed && !(toR > fromR))
         return { success: false, reason: "Le pedine panna non possono catturare all'indietro" };
     }
-    const midR = fromR + dr / 2, midC = fromC + dc / 2;
+    const midR = fromR + dr/2, midC = fromC + dc/2;
     const enemy = board[midR][midC];
     if (!enemy)
       return { success: false, reason: "Nessun nemico da catturare" };
@@ -426,7 +426,7 @@ function findAllCaptures(board, color) {
 function findCapturesForPiece(board, r, c) {
   const piece = board[r][c];
   if (!piece) return [];
-  const directions = [[-2,-2], [-2,2], [2,-2], [2,2]];
+  const directions = [[-2,-2],[-2,2],[2,-2],[2,2]];
   const caps = [];
   directions.forEach(([dr, dc]) => {
     const newR = r + dr, newC = c + dc;
@@ -439,9 +439,10 @@ function findCapturesForPiece(board, r, c) {
 }
 
 /****************************************************************
- * 14) isThisMoveACapture: verifica se il movimento da (from) a (to) è una cattura valida.
- * IMPORTANTE: La casella di destinazione DEVE essere vuota.
- * Le pedine normali (non re) possono catturare solo in avanti.
+ * 14) isThisMoveACapture: verifica se il movimento da (from) a (to)
+ * è una cattura valida.
+ * IMPORTANTE: La casella di destinazione deve essere vuota.
+ * Le pedine normali non possono catturare all'indietro, solo le dame.
  ****************************************************************/
 function isThisMoveACapture(board, piece, fromR, fromC, toR, toC) {
   if (Math.abs(toR - fromR) !== 2 || Math.abs(toC - fromC) !== 2)
@@ -450,8 +451,8 @@ function isThisMoveACapture(board, piece, fromR, fromC, toR, toC) {
   if (board[toR][toC] !== '')
     return false;
     
-  // Se il pezzo non è un re, controlla che la cattura sia in avanti
   const isKing = piece.endsWith('K');
+  // Se il pezzo NON è re, può catturare solo in avanti:
   if (!isKing) {
     if (piece.startsWith('red') && !(toR < fromR))
       return false;
@@ -470,8 +471,8 @@ function isThisMoveACapture(board, piece, fromR, fromC, toR, toC) {
 }
 
 /****************************************************************
- * 15) updateBoardOnFirebase: salva la board su Firebase e passa il turno.
- * Se sameTurn = true (cattura multipla), il turno rimane invariato.
+ * 15) updateBoardOnFirebase: salva la board su Firebase e passa il turno
+ * Se sameTurn = true (cattura multipla), il turno non cambia.
  ****************************************************************/
 function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
   const ref = firebase.database().ref(`games/${currentGameId}`);
