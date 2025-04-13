@@ -1,83 +1,51 @@
 body {
-  background: #1e1e1e;
-  color: white;
   font-family: Arial, sans-serif;
-  text-align: center;
+  background-color: #f4f4f4;
   margin: 0;
-  padding: 0;
+  padding: 10px;
+  text-align: center;
 }
-
-h1 {
-  margin-top: 20px;
+#status {
+  margin-bottom: 10px;
+  font-weight: bold;
 }
-
-/* Damiera: griglia 8x8 */
 .board {
   display: grid;
   grid-template-columns: repeat(8, 50px);
-  width: 400px;
-  margin: 20px auto;
+  grid-template-rows: repeat(8, 50px);
+  margin: 0 auto;
 }
 .square {
   width: 50px;
   height: 50px;
-}
-.light {
-  background-color: #eee;
-}
-.dark {
-  background-color: #444;
-}
-
-/* Evidenziazione della cella selezionata */
-.selected {
-  outline: 2px solid yellow;
   box-sizing: border-box;
 }
-
-/* Pedine:
-   - "red" per il challenger
-   - "panna" per chi accetta la sfida
-   - I re hanno un bordo d'oro */
+.square.light {
+  background-color: #eee;
+}
+.square.dark {
+  background-color: #444;
+}
 .piece {
-  border-radius: 50%;
   width: 40px;
   height: 40px;
+  border-radius: 50%;
   margin: 5px auto;
 }
-.piece.red {
+.red {
   background-color: red;
 }
-.piece.panna {
-  background-color: #f5e3b3;
+.panna {
+  background-color: #f5deb3;
 }
-.piece.redK {
-  background-color: red;
+.redK, .pannaK {
   border: 2px solid gold;
 }
-.piece.pannaK {
-  background-color: #f5e3b3;
-  border: 2px solid gold;
+.selected {
+  border: 2px solid yellow;
 }
-
-/* Lista utenti */
 .users {
+  margin: 10px auto;
   max-width: 400px;
-  margin: 20px auto;
   text-align: left;
-}
-.users h4 {
-  margin: 10px 0 5px 0;
-}
-.users ul {
-  list-style-type: none;
-  padding: 0;
-  margin: 0;
-}
-.users li {
-  margin: 5px 0;
-}
-.users button {
-  margin-left: 10px;
-  cursor: pointer;
 }

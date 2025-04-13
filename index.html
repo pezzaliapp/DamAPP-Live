@@ -1,31 +1,19 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>DamAPP Live</title>
-  <link rel="stylesheet" href="style.css">
-  
-  <!-- Firebase compat (versione 8) -->
+  <link rel="stylesheet" href="style.css" />
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  
-  <!-- Configurazione Firebase -->
   <script src="firebase-config.js" defer></script>
-  
-  <!-- Logica del gioco -->
   <script src="app.js" defer></script>
 </head>
 <body>
   <h1>DamAPP Live</h1>
-  
-  <!-- Elemento per mostrare messaggi e status (è importante che abbia id="status") -->
   <div id="status"></div>
-  
-  <!-- Lista degli utenti online, per sfidare -->
   <div id="users" class="users"></div>
-  
-  <!-- Damiera del gioco -->
   <div id="board" class="board"></div>
 </body>
 </html>
