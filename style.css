@@ -55,13 +55,12 @@ h1 {
   background-color: #4fa;
 }
 
-/* Damiera */
+/* Damiera: la dimensione si adatta allo schermo */
 .board {
-  /* 80vmin => 80% del lato minore della finestra, 
-     max 600px => si adatta a schermi piccoli e grandi */
+  /* 80vmin -> usa il 80% del lato minore della finestra, massimo 600px */
   width: min(80vmin, 600px);
   height: min(80vmin, 600px);
-  margin: 0 auto 2rem; /* centrata, con spazio in fondo */
+  margin: 0 auto 2rem;
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   grid-template-rows: repeat(8, 1fr);
@@ -70,7 +69,7 @@ h1 {
   box-shadow: 0 0 10px rgba(0,0,0,0.2);
 }
 
-/* Caselle */
+/* Caselle della damiera */
 .square {
   position: relative;
   width: 100%;
@@ -84,7 +83,7 @@ h1 {
   background-color: #444;
 }
 
-/* Pedine */
+/* Pedine: impostazioni generali */
 .piece {
   width: 80%;
   height: 80%;
@@ -97,6 +96,8 @@ h1 {
 .piece:hover {
   transform: scale(1.05);
 }
+
+/* Pedine normali */
 .red {
   background-color: red;
 }
@@ -104,13 +105,20 @@ h1 {
   background-color: #f5deb3;
 }
 
-/* Pedine promosse (re) */
-.redK, .pannaK {
+/* Pedine promosse (re):
+   Mantengono il colore originale, con un bordo e ombra in oro */
+.redK {
+  background-color: red;
+  border: 2px solid gold;
+  box-shadow: 0 2px 8px rgba(255,215,0,0.8);
+}
+.pannaK {
+  background-color: #f5deb3;
   border: 2px solid gold;
   box-shadow: 0 2px 8px rgba(255,215,0,0.8);
 }
 
-/* Casella selezionata (colpo d'occhio) */
+/* Evidenziazione della casella selezionata */
 .selected {
   outline: 3px solid yellow;
   outline-offset: -3px;
