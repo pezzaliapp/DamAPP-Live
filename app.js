@@ -2,7 +2,7 @@
  * CONFIGURAZIONE REGOLAMENTO
  ***************************************/
 const forceCapture = true;  // Se true, la cattura è obbligatoria
-const multiCaptureTimeoutMS = 5000; // Tempo (ms) per effettuare ulteriori catture; dopo questo scade il turno
+const multiCaptureTimeoutMS = 5000; // Timeout per cattura multipla (5 sec)
 
 /***************************************
  * Riferimenti Firebase & Variabili Globali
@@ -29,6 +29,7 @@ function cloneBoard(board) {
  * Funzione helper: controlla se un giocatore ha mosse legali
  ***************************************/
 function playerHasMoves(board, color) {
+  // Questa funzione non viene più utilizzata per terminare automaticamente la partita.
   for (let r = 0; r < board.length; r++) {
     for (let c = 0; c < board[r].length; c++) {
       const piece = board[r][c];
@@ -180,8 +181,8 @@ function createInitialBoard() {
   for (let r = 0; r < 8; r++) {
     const row = [];
     for (let c = 0; c < 8; c++) {
-      if ((r + c) % 2 === 1 && r < 3) row.push('panna');
-      else if ((r + c) % 2 === 1 && r > 4) row.push('red');
+      if ((r+c) % 2 === 1 && r < 3) row.push('panna');
+      else if ((r+c) % 2 === 1 && r > 4) row.push('red');
       else row.push('');
     }
     board.push(row);
@@ -206,14 +207,13 @@ function listenToGame(gameId) {
 }
 
 /**************************************************************
- * 8) renderBoard: disegna la damiera; se sei "panna" inverte le righe
+ * 8) renderBoard: disegna la damiera; se sei "panna", inverte l'ordine delle righe
  **************************************************************/
 function renderBoard(board, turn) {
   console.log(`renderBoard: Turno di ${turn}. Io sono ${playerColor}`);
   const container = document.getElementById('board');
   container.innerHTML = '';
-  if (turn)
-    document.getElementById('status').textContent = `Turno di ${turn.toUpperCase()}`;
+  if (turn) document.getElementById('status').textContent = `Turno di ${turn.toUpperCase()}`;
   
   let rowIndices = [];
   if (playerColor === 'panna') {
@@ -225,7 +225,7 @@ function renderBoard(board, turn) {
   rowIndices.forEach(r => {
     for (let c = 0; c < board[r].length; c++) {
       const square = document.createElement('div');
-      square.className = 'square ' + (((r + c) % 2 === 0) ? 'light' : 'dark');
+      square.className = 'square ' + (((r+c) % 2 === 0) ? 'light' : 'dark');
       if (selectedCell && selectedCell.r === r && selectedCell.c === c)
         square.classList.add('selected');
       const pieceVal = board[r][c];
@@ -246,14 +246,14 @@ function renderBoard(board, turn) {
 function onSquareClick(board, turn, r, c) {
   console.log(`Cliccato su cella (${r},${c}). Turno: ${turn} – Io: ${playerColor}`);
   
-  // Se il giocatore clicca quando non è il suo turno, mostra solo il messaggio e termina la funzione
+  // Se non è il mio turno (solo in multiplayer)
   if (!testingMode && turn !== playerColor) {
     console.log("Non è il mio turno");
     document.getElementById('status').textContent = "Attendi il tuo turno per muovere";
     return;
   }
   
-  // Se clicco sulla stessa cella già selezionata, deseleziono
+  // Se clicco nuovamente sulla stessa cella, deseleziona
   if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
     console.log("Deseleziono la pedina");
     selectedCell = null;
@@ -292,15 +292,14 @@ function onSquareClick(board, turn, r, c) {
       console.log("Mossa rifiutata:", moveResult.reason);
       return;
     }
-    // Se la mossa è una cattura, controlla se sono disponibili ulteriori catture per la stessa pedina
     if (isCap) {
       const extraCaps = findCapturesForPiece(board, r, c);
       if (extraCaps.length > 0) {
         selectedCell = { r, c };
-        updateBoardOnFirebase(board, turn, true); // turno rimane lo stesso
+        updateBoardOnFirebase(board, turn, true); // Turno non cambia
         renderBoard(board, turn);
         console.log("Cattura multipla: continua a catturare");
-        // Imposta un timeout: se l'utente non continua entro multiCaptureTimeoutMS, passa il turno
+        // Imposta timeout per cattura multipla: se l'utente non effettua la mossa entro il tempo, il turno passa
         clearTimeout(multiCaptureTimeout);
         multiCaptureTimeout = setTimeout(() => {
           console.log("Timeout cattura multipla: turno passato");
@@ -409,7 +408,7 @@ function findCapturesForPiece(board, r, c) {
 }
 
 /****************************************************************
- * 14) isThisMoveACapture: verifica se il movimento da (from) a (to) 
+ * 14) isThisMoveACapture: verifica se il movimento da (from) a (to)
  * è una cattura valida
  ****************************************************************/
 function isThisMoveACapture(board, piece, fromR, fromC, toR, toC) {
@@ -422,7 +421,7 @@ function isThisMoveACapture(board, piece, fromR, fromC, toR, toC) {
 
 /****************************************************************
  * 15) updateBoardOnFirebase: salva la board su Firebase e passa il turno
- * Se sameTurn=true (cattura multipla), il turno non cambia.
+ * Se sameTurn = true (cattura multipla), il turno rimane invariato.
  ****************************************************************/
 function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
   const ref = firebase.database().ref(`games/${currentGameId}`);
@@ -434,6 +433,7 @@ function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
     }
     const nextTurn = sameTurn ? currentTurn : (currentTurn === 'red' ? 'panna' : 'red');
     console.log("Aggiorno board. Turno passa a:", nextTurn);
+    // Non viene effettuato alcun controllo sulle mosse del prossimo giocatore per evitare blocchi
     ref.update({ board: localBoard, turn: nextTurn });
   });
 }
