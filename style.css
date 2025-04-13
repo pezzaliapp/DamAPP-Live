@@ -1,36 +1,101 @@
+/* Impostazioni di base del corpo */
 body {
-  font-family: Arial, sans-serif;
-  background-color: #f4f4f4;
   margin: 0;
-  padding: 10px;
+  padding: 0;
+  background: #f0f0f0;
+  font-family: Arial, sans-serif;
   text-align: center;
+  color: #333;
 }
+
+/* Titolo della pagina */
+h1 {
+  margin: 1rem 0 0.5rem;
+}
+
+/* Elemento status (messaggi al giocatore) */
 #status {
-  margin-bottom: 10px;
+  margin-bottom: 1rem;
   font-weight: bold;
+  font-size: 1.1rem;
 }
+
+/* Contenitore degli utenti online */
+.users {
+  margin: 0 auto 1rem;
+  max-width: 400px;
+  text-align: left;
+  background: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  box-shadow: 0 0 6px rgba(0,0,0,0.1);
+}
+.users h4 {
+  margin: 0.5rem 0;
+}
+.users ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.users li {
+  margin: 0.3rem 0;
+}
+.users button {
+  margin-left: 10px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  border: none;
+  background-color: #3e7;
+  color: #333;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+.users button:hover {
+  background-color: #4fa;
+}
+
+/* Damiera */
 .board {
+  /* 80vmin => 80% del lato minore della finestra, 
+     max 600px => si adatta a schermi piccoli e grandi */
+  width: min(80vmin, 600px);
+  height: min(80vmin, 600px);
+  margin: 0 auto 2rem; /* centrata, con spazio in fondo */
   display: grid;
-  grid-template-columns: repeat(8, 50px);
-  grid-template-rows: repeat(8, 50px);
-  margin: 0 auto;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  border: 4px solid #444;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
 }
+
+/* Caselle */
 .square {
-  width: 50px;
-  height: 50px;
+  position: relative;
+  width: 100%;
+  height: 100%;
   box-sizing: border-box;
 }
-.square.light {
-  background-color: #eee;
+.light {
+  background-color: #f8f8f8;
 }
-.square.dark {
+.dark {
   background-color: #444;
 }
+
+/* Pedine */
 .piece {
-  width: 40px;
-  height: 40px;
+  width: 80%;
+  height: 80%;
   border-radius: 50%;
-  margin: 5px auto;
+  margin: 10% auto;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.piece:hover {
+  transform: scale(1.05);
 }
 .red {
   background-color: red;
@@ -38,14 +103,15 @@ body {
 .panna {
   background-color: #f5deb3;
 }
+
+/* Pedine promosse (re) */
 .redK, .pannaK {
   border: 2px solid gold;
+  box-shadow: 0 2px 8px rgba(255,215,0,0.8);
 }
+
+/* Casella selezionata (colpo d'occhio) */
 .selected {
-  border: 2px solid yellow;
-}
-.users {
-  margin: 10px auto;
-  max-width: 400px;
-  text-align: left;
+  outline: 3px solid yellow;
+  outline-offset: -3px;
 }
