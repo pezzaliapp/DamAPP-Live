@@ -5,6 +5,18 @@ const forceCapture = true;  // Se true, la cattura è obbligatoria
 const multiCaptureTimeoutMS = 5000; // Timeout per cattura multipla (5 sec)
 
 /***************************************
+ * FUNZIONE DI UTILITÀ: updateStatus
+ * Aggiorna l'elemento con id "status" e logga in console
+ ***************************************/
+function updateStatus(message) {
+  const statusElem = document.getElementById("status");
+  if (statusElem) {
+    statusElem.innerText = message;
+  }
+  console.log("Status:", message);
+}
+
+/***************************************
  * Riferimenti Firebase & Variabili Globali
  ***************************************/
 let nickname = '';
@@ -29,7 +41,6 @@ function cloneBoard(board) {
  * Funzione helper: controlla se un giocatore ha mosse legali
  ***************************************/
 function playerHasMoves(board, color) {
-  // Questa funzione non viene più utilizzata per terminare automaticamente la partita.
   for (let r = 0; r < board.length; r++) {
     for (let c = 0; c < board[r].length; c++) {
       const piece = board[r][c];
@@ -73,8 +84,7 @@ function init() {
     userRef.update({ lastActive: Date.now() });
   }, 30000);
   
-  document.getElementById("status").textContent =
-    `Benvenuto, ${nickname}! Seleziona un utente da sfidare.`;
+  updateStatus(`Benvenuto, ${nickname}! Seleziona un utente da sfidare.`);
   console.log(`Benvenuto ${nickname}`);
   
   listenForUsers();
@@ -85,7 +95,7 @@ function init() {
       currentGameId = data.currentGame;
       console.log("Carico partita esistente, ID:", currentGameId);
       listenToGame(currentGameId);
-      document.getElementById("status").textContent = "Partita iniziata!";
+      updateStatus("Partita iniziata!");
     }
   });
 }
@@ -168,7 +178,7 @@ function startGameWith(opponentId, selfId) {
   usersRef.child(selfId).update({ currentGame: gameId });
   usersRef.child(opponentId).update({ currentGame: gameId });
   listenToGame(gameId);
-  document.getElementById("status").textContent = "Partita iniziata!";
+  updateStatus("Partita iniziata!");
 }
 
 /*******************************************************
@@ -181,8 +191,8 @@ function createInitialBoard() {
   for (let r = 0; r < 8; r++) {
     const row = [];
     for (let c = 0; c < 8; c++) {
-      if ((r+c) % 2 === 1 && r < 3) row.push('panna');
-      else if ((r+c) % 2 === 1 && r > 4) row.push('red');
+      if ((r + c) % 2 === 1 && r < 3) row.push('panna');
+      else if ((r + c) % 2 === 1 && r > 4) row.push('red');
       else row.push('');
     }
     board.push(row);
@@ -213,7 +223,7 @@ function renderBoard(board, turn) {
   console.log(`renderBoard: Turno di ${turn}. Io sono ${playerColor}`);
   const container = document.getElementById('board');
   container.innerHTML = '';
-  if (turn) document.getElementById('status').textContent = `Turno di ${turn.toUpperCase()}`;
+  if (turn) updateStatus(`Turno di ${turn.toUpperCase()}`);
   
   let rowIndices = [];
   if (playerColor === 'panna') {
@@ -225,7 +235,7 @@ function renderBoard(board, turn) {
   rowIndices.forEach(r => {
     for (let c = 0; c < board[r].length; c++) {
       const square = document.createElement('div');
-      square.className = 'square ' + (((r+c) % 2 === 0) ? 'light' : 'dark');
+      square.className = 'square ' + (((r + c) % 2 === 0) ? 'light' : 'dark');
       if (selectedCell && selectedCell.r === r && selectedCell.c === c)
         square.classList.add('selected');
       const pieceVal = board[r][c];
@@ -246,14 +256,14 @@ function renderBoard(board, turn) {
 function onSquareClick(board, turn, r, c) {
   console.log(`Cliccato su cella (${r},${c}). Turno: ${turn} – Io: ${playerColor}`);
   
-  // Se non è il mio turno (solo in multiplayer)
+  // Se il giocatore clicca quando non è il suo turno, mostra un messaggio
   if (!testingMode && turn !== playerColor) {
     console.log("Non è il mio turno");
-    document.getElementById('status').textContent = "Attendi il tuo turno per muovere";
+    updateStatus("Attendi il tuo turno per muovere");
     return;
   }
   
-  // Se clicco nuovamente sulla stessa cella, deseleziona
+  // Se clicco sulla stessa cella già selezionata, deseleziona
   if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
     console.log("Deseleziono la pedina");
     selectedCell = null;
@@ -270,6 +280,7 @@ function onSquareClick(board, turn, r, c) {
         const capForPiece = availableCaptures.filter(cap => cap.fromR === r && cap.fromC === c);
         if (capForPiece.length === 0) {
           console.log("Devi catturare: questa pedina non può");
+          updateStatus("Devi catturare: scegli un'altra pedina");
           return;
         }
       }
@@ -285,21 +296,22 @@ function onSquareClick(board, turn, r, c) {
     const isCap = isThisMoveACapture(board, currentPiece, fromR, fromC, r, c);
     if (forceCapture && availableCaptures.length > 0 && !isCap) {
       console.log("Mossa rifiutata: devi catturare");
+      updateStatus("Mossa rifiutata: devi catturare");
       return;
     }
     const moveResult = tryMove(board, fromR, fromC, r, c);
     if (!moveResult.success) {
       console.log("Mossa rifiutata:", moveResult.reason);
+      updateStatus(`Mossa rifiutata: ${moveResult.reason}`);
       return;
     }
     if (isCap) {
       const extraCaps = findCapturesForPiece(board, r, c);
       if (extraCaps.length > 0) {
         selectedCell = { r, c };
-        updateBoardOnFirebase(board, turn, true); // Turno non cambia
+        updateBoardOnFirebase(board, turn, true); // turno rimane lo stesso
         renderBoard(board, turn);
         console.log("Cattura multipla: continua a catturare");
-        // Imposta timeout per cattura multipla: se l'utente non effettua la mossa entro il tempo, il turno passa
         clearTimeout(multiCaptureTimeout);
         multiCaptureTimeout = setTimeout(() => {
           console.log("Timeout cattura multipla: turno passato");
@@ -307,6 +319,7 @@ function onSquareClick(board, turn, r, c) {
           updateBoardOnFirebase(board, turn, false);
           renderBoard(board, turn);
         }, multiCaptureTimeoutMS);
+        updateStatus("Cattura multipla: continua a catturare");
         return;
       }
     }
@@ -390,7 +403,7 @@ function findAllCaptures(board, color) {
 }
 
 /****************************************************************
- * 13) findCapturesForPiece: ritorna le catture disponibili per il pezzo in (r,c)
+ * 13) findCapturesForPiece: ritorna le catture disponibili per il pezzo in (r, c)
  ****************************************************************/
 function findCapturesForPiece(board, r, c) {
   const piece = board[r][c];
@@ -421,7 +434,7 @@ function isThisMoveACapture(board, piece, fromR, fromC, toR, toC) {
 
 /****************************************************************
  * 15) updateBoardOnFirebase: salva la board su Firebase e passa il turno
- * Se sameTurn = true (cattura multipla), il turno rimane invariato.
+ * Se sameTurn = true (cattura multipla), il turno non cambia.
  ****************************************************************/
 function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
   const ref = firebase.database().ref(`games/${currentGameId}`);
@@ -433,7 +446,6 @@ function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
     }
     const nextTurn = sameTurn ? currentTurn : (currentTurn === 'red' ? 'panna' : 'red');
     console.log("Aggiorno board. Turno passa a:", nextTurn);
-    // Non viene effettuato alcun controllo sulle mosse del prossimo giocatore per evitare blocchi
     ref.update({ board: localBoard, turn: nextTurn });
   });
 }
