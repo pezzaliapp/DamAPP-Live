@@ -18,6 +18,27 @@ function updateStatus(message) {
 }
 
 /***************************************
+ * FUNZIONE UTILITY: checkGameOver
+ * Verifica se un colore ha finito le pedine (sia normali che promosse).
+ * Restituisce "red" se il giocatore red ha 0 pezzi, "panna" se il giocatore panna ha 0 pezzi,
+ * oppure null se entrambe hanno ancora pezzi.
+ ***************************************/
+function checkGameOver(board) {
+  let countRed = 0;
+  let countPanna = 0;
+  for (let r = 0; r < board.length; r++) {
+    for (let c = 0; c < board[r].length; c++) {
+      const piece = board[r][c];
+      if (piece && piece.startsWith("red")) countRed++;
+      if (piece && piece.startsWith("panna")) countPanna++;
+    }
+  }
+  if (countRed === 0) return "red";
+  if (countPanna === 0) return "panna";
+  return null;
+}
+
+/***************************************
  * Riferimenti Firebase & Variabili Globali
  ***************************************/
 let nickname = '';
@@ -27,8 +48,8 @@ let userRef = null;
 let selectedCell = null;           // {r, c} oppure null
 let multiCaptureTimeout = null;    // Timeout per cattura multipla
 
-const usersRef = firebase.database().ref('users');
-const gamesRef = firebase.database().ref('games');
+const usersRef = firebase.database().ref("users");
+const gamesRef = firebase.database().ref("games");
 
 /***************************************
  * Funzione helper: clona la board
@@ -46,19 +67,25 @@ function playerHasMoves(board, color) {
       const piece = board[r][c];
       if (piece && piece.startsWith(color)) {
         let simpleDirs = [];
-        const isKing = piece.endsWith('K');
+        const isKing = piece.endsWith("K");
         if (isKing) {
-          simpleDirs = [[-1,-1], [-1,1], [1,-1], [1,1]];
+          simpleDirs = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
         } else {
-          simpleDirs = color === 'red' ? [[-1,-1], [-1,1]] : [[1,-1], [1,1]];
+          simpleDirs = color === "red" ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
         }
         for (let [dr, dc] of simpleDirs) {
-          let newR = r + dr, newC = c + dc;
-          if (newR >= 0 && newR < 8 && newC >= 0 && newC < 8 && board[newR][newC] === '')
+          let newR = r + dr,
+            newC = c + dc;
+          if (
+            newR >= 0 &&
+            newR < 8 &&
+            newC >= 0 &&
+            newC < 8 &&
+            board[newR][newC] === ""
+          )
             return true;
         }
-        if (findCapturesForPiece(board, r, c).length > 0)
-          return true;
+        if (findCapturesForPiece(board, r, c).length > 0) return true;
       }
     }
   }
@@ -70,7 +97,6 @@ function playerHasMoves(board, color) {
  **************************************************/
 function init() {
   nickname = prompt("Inserisci il tuo nome") || "Guest" + Math.floor(Math.random() * 1000);
-  
   userRef = usersRef.push({
     name: nickname,
     status: "online",
@@ -79,16 +105,12 @@ function init() {
     currentGame: ""
   });
   userRef.onDisconnect().remove();
-  
   setInterval(() => {
     userRef.update({ lastActive: Date.now() });
   }, 30000);
-  
   updateStatus(`Benvenuto, ${nickname}! Seleziona un utente da sfidare.`);
   console.log(`Benvenuto ${nickname}`);
-  
   listenForUsers();
-  
   userRef.on("value", snapshot => {
     const data = snapshot.val();
     if (data.currentGame && data.currentGame !== currentGameId) {
@@ -171,7 +193,7 @@ function startGameWith(opponentId, selfId) {
   console.log(`Creo partita ${gameId}. Opponent (red): ${opponentId}, Io (panna): ${selfId}`);
   gamesRef.child(gameId).set({
     board: createInitialBoard(),
-    turn: 'red',  // Turno iniziale: red
+    turn: "red", // Turno iniziale: red
     players: { red: opponentId, panna: selfId }
   });
   usersRef.child(selfId).child("invite").remove();
@@ -193,11 +215,11 @@ function createInitialBoard() {
     const row = [];
     for (let c = 0; c < 8; c++) {
       if ((r + c) % 2 === 1 && r < 3)
-        row.push('panna');
+        row.push("panna");
       else if ((r + c) % 2 === 1 && r > 4)
-        row.push('red');
+        row.push("red");
       else
-        row.push('');
+        row.push("");
     }
     board.push(row);
   }
@@ -209,15 +231,26 @@ function createInitialBoard() {
  *********************************************************************/
 function listenToGame(gameId) {
   const ref = firebase.database().ref(`games/${gameId}`);
-  ref.on('value', snapshot => {
+  ref.on("value", snapshot => {
     const data = snapshot.val();
     if (data && data.board) {
       if (data.players.red === userRef.key)
-        playerColor = 'red';
+        playerColor = "red";
       else if (data.players.panna === userRef.key)
-        playerColor = 'panna';
+        playerColor = "panna";
       console.log(`Assegnato playerColor: ${playerColor} per l'utente ${userRef.key}`);
       renderBoard(data.board, data.turn);
+      // Verifica la condizione di game over
+      const overColor = checkGameOver(data.board);
+      if (overColor) {
+        if (overColor === playerColor) {
+          updateStatus("Hai perso la partita");
+        } else {
+          updateStatus("Hai vinto la partita");
+        }
+        // Puoi eventualmente aggiornare il record della partita con "finished: true"
+        ref.update({ finished: true });
+      }
     }
   });
 }
@@ -227,31 +260,30 @@ function listenToGame(gameId) {
  **************************************************************/
 function renderBoard(board, turn) {
   console.log(`renderBoard: Turno di ${turn}. Io sono ${playerColor}`);
-  const container = document.getElementById('board');
-  container.innerHTML = '';
-  if (turn)
-    updateStatus(`Turno di ${turn.toUpperCase()}`);
+  const container = document.getElementById("board");
+  container.innerHTML = "";
+  if (turn) updateStatus(`Turno di ${turn.toUpperCase()}`);
   
   let rowIndices = [];
-  if (playerColor === 'panna') {
-    for (let r = board.length - 1; r >= 0; r--)
-      rowIndices.push(r);
+  if (playerColor === "panna") {
+    for (let r = board.length - 1; r >= 0; r--) rowIndices.push(r);
   } else {
-    for (let r = 0; r < board.length; r++)
-      rowIndices.push(r);
+    for (let r = 0; r < board.length; r++) rowIndices.push(r);
   }
   
   rowIndices.forEach(r => {
     for (let c = 0; c < board[r].length; c++) {
-      const square = document.createElement('div');
-      square.className = 'square ' + (((r + c) % 2 === 0) ? 'light' : 'dark');
+      const square = document.createElement("div");
+      square.className =
+        "square " + (((r + c) % 2 === 0) ? "light" : "dark");
       if (selectedCell && selectedCell.r === r && selectedCell.c === c)
-        square.classList.add('selected');
+        square.classList.add("selected");
       const pieceVal = board[r][c];
       if (pieceVal) {
-        const piece = document.createElement('div');
-        // Se il pezzo è "redK" o "pannaK" mantiene il colore originale (red o panna) con un bordo giallo
-        piece.className = 'piece ' + pieceVal;
+        const piece = document.createElement("div");
+        /* Per le pedine promosse, usiamo le classi "redK" o "pannaK" in modo
+           che lo stile (colore di background) rispecchi il colore originale, con un bordo in oro */
+        piece.className = "piece " + pieceVal;
         square.appendChild(piece);
       }
       square.onclick = () => onSquareClick(board, turn, r, c);
@@ -266,7 +298,7 @@ function renderBoard(board, turn) {
 function onSquareClick(board, turn, r, c) {
   console.log(`Cliccato su cella (${r},${c}). Turno: ${turn} – Io: ${playerColor}`);
   
-  // Se non è il tuo turno (solo in modalità multiplayer), mostra il messaggio e ritorna
+  // Se non è il tuo turno (solo in modalità multiplayer), mostra messaggio e ritorna
   if (!testingMode && turn !== playerColor) {
     console.log("Non è il mio turno");
     updateStatus("Attendi il tuo turno per muovere");
@@ -287,7 +319,9 @@ function onSquareClick(board, turn, r, c) {
     const pieceVal = board[r][c];
     if (pieceVal && pieceVal.startsWith(turn)) {
       if (forceCapture && availableCaptures.length > 0) {
-        const capForPiece = availableCaptures.filter(cap => cap.fromR === r && cap.fromC === c);
+        const capForPiece = availableCaptures.filter(
+          cap => cap.fromR === r && cap.fromC === c
+        );
         if (capForPiece.length === 0) {
           console.log("Devi catturare: questa pedina non può");
           updateStatus("Devi catturare: scegli un'altra pedina");
@@ -319,7 +353,7 @@ function onSquareClick(board, turn, r, c) {
       const extraCaps = findCapturesForPiece(board, r, c);
       if (extraCaps.length > 0) {
         selectedCell = { r, c };
-        updateBoardOnFirebase(board, turn, true); // Il turno rimane lo stesso
+        updateBoardOnFirebase(board, turn, true); // Turno non cambia
         renderBoard(board, turn);
         console.log("Cattura multipla: continua a catturare");
         updateStatus("Cattura multipla: continua a catturare");
@@ -329,7 +363,7 @@ function onSquareClick(board, turn, r, c) {
           selectedCell = null;
           updateBoardOnFirebase(board, turn, false);
           renderBoard(board, turn);
-          updateStatus(`Turno passato a ${turn === 'red' ? 'PANNA' : 'RED'}`);
+          updateStatus(`Turno passato a ${turn === "red" ? "PANNA" : "RED"}`);
         }, multiCaptureTimeoutMS);
         return;
       }
@@ -343,14 +377,14 @@ function onSquareClick(board, turn, r, c) {
  * 10) tryMove: verifica la validità della mossa (passo semplice o cattura)
  ********************************************************************/
 function tryMove(board, fromR, fromC, toR, toC) {
-  if (board[toR][toC] !== '')
+  if (board[toR][toC] !== "")
     return { success: false, reason: "La destinazione non è vuota" };
   const pieceVal = board[fromR][fromC];
   if (!pieceVal)
     return { success: false, reason: "Nessuna pedina da muovere" };
   const dr = toR - fromR, dc = toC - fromC;
-  const isRed = pieceVal.startsWith('red');
-  const isKing = pieceVal.endsWith('K');
+  const isRed = pieceVal.startsWith("red");
+  const isKing = pieceVal.endsWith("K");
   
   // Movimento semplice: 1 casella in diagonale
   if (Math.abs(dr) === 1 && Math.abs(dc) === 1) {
@@ -361,7 +395,7 @@ function tryMove(board, fromR, fromC, toR, toC) {
         return { success: false, reason: "La pedina panna si muove solo verso il basso" };
     }
     board[toR][toC] = pieceVal;
-    board[fromR][fromC] = '';
+    board[fromR][fromC] = "";
     doPromotionIfNeeded(board, toR, toC);
     return { success: true };
   }
@@ -375,15 +409,15 @@ function tryMove(board, fromR, fromC, toR, toC) {
       if (!isRed && !(toR > fromR))
         return { success: false, reason: "Le pedine panna non possono catturare all'indietro" };
     }
-    const midR = fromR + dr/2, midC = fromC + dc/2;
+    const midR = fromR + dr / 2, midC = fromC + dc / 2;
     const enemy = board[midR][midC];
     if (!enemy)
       return { success: false, reason: "Nessun nemico da catturare" };
-    if (enemy.startsWith(pieceVal.startsWith('red') ? 'red' : 'panna'))
+    if (enemy.startsWith(pieceVal.startsWith("red") ? "red" : "panna"))
       return { success: false, reason: "Non puoi catturare una tua pedina" };
     board[toR][toC] = pieceVal;
-    board[fromR][fromC] = '';
-    board[midR][midC] = '';
+    board[fromR][fromC] = "";
+    board[midR][midC] = "";
     doPromotionIfNeeded(board, toR, toC);
     return { success: true };
   }
@@ -396,11 +430,11 @@ function tryMove(board, fromR, fromC, toR, toC) {
  ****************************************************************/
 function doPromotionIfNeeded(board, r, c) {
   const pieceVal = board[r][c];
-  if (!pieceVal || pieceVal.endsWith('K')) return;
-  if (pieceVal === 'red' && r === 0)
-    board[r][c] = 'redK';
-  if (pieceVal === 'panna' && r === 7)
-    board[r][c] = 'pannaK';
+  if (!pieceVal || pieceVal.endsWith("K")) return;
+  if (pieceVal === "red" && r === 0)
+    board[r][c] = "redK";
+  if (pieceVal === "panna" && r === 7)
+    board[r][c] = "pannaK";
 }
 
 /****************************************************************
@@ -439,8 +473,7 @@ function findCapturesForPiece(board, r, c) {
 }
 
 /****************************************************************
- * 14) isThisMoveACapture: verifica se il movimento da (from) a (to)
- * è una cattura valida.
+ * 14) isThisMoveACapture: verifica se il movimento da (from) a (to) è una cattura valida.
  * IMPORTANTE: La casella di destinazione deve essere vuota.
  * Le pedine normali non possono catturare all'indietro, solo le dame.
  ****************************************************************/
@@ -448,15 +481,15 @@ function isThisMoveACapture(board, piece, fromR, fromC, toR, toC) {
   if (Math.abs(toR - fromR) !== 2 || Math.abs(toC - fromC) !== 2)
     return false;
   // Verifica che la casella di destinazione sia vuota
-  if (board[toR][toC] !== '')
+  if (board[toR][toC] !== "")
     return false;
     
-  const isKing = piece.endsWith('K');
+  const isKing = piece.endsWith("K");
   // Se il pezzo NON è re, può catturare solo in avanti:
   if (!isKing) {
-    if (piece.startsWith('red') && !(toR < fromR))
+    if (piece.startsWith("red") && !(toR < fromR))
       return false;
-    if (piece.startsWith('panna') && !(toR > fromR))
+    if (piece.startsWith("panna") && !(toR > fromR))
       return false;
   }
   
@@ -465,13 +498,13 @@ function isThisMoveACapture(board, piece, fromR, fromC, toR, toC) {
   const enemy = board[midR][midC];
   if (!enemy)
     return false;
-  if (enemy.startsWith(piece.startsWith('red') ? 'red' : 'panna'))
+  if (enemy.startsWith(piece.startsWith("red") ? "red" : "panna"))
     return false;
   return true;
 }
 
 /****************************************************************
- * 15) updateBoardOnFirebase: salva la board su Firebase e passa il turno
+ * 15) updateBoardOnFirebase: salva la board su Firebase e passa il turno.
  * Se sameTurn = true (cattura multipla), il turno non cambia.
  ****************************************************************/
 function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
@@ -482,10 +515,43 @@ function updateBoardOnFirebase(localBoard, currentTurn, sameTurn = false) {
       console.log("Partita non trovata, ID:", currentGameId);
       return;
     }
-    const nextTurn = sameTurn ? currentTurn : (currentTurn === 'red' ? 'panna' : 'red');
+    const nextTurn = sameTurn ? currentTurn : (currentTurn === "red" ? "panna" : "red");
     console.log("Aggiorno board. Turno passa a:", nextTurn);
+    
+    // Verifica se la partita è terminata (se un giocatore ha zero pezzi)
+    const gameOver = checkGameOver(localBoard);
+    if (gameOver) {
+      if (gameOver === playerColor) {
+        updateStatus("Hai perso la partita");
+      } else {
+        updateStatus("Hai vinto la partita");
+      }
+      ref.update({ board: localBoard, turn: nextTurn, finished: true });
+      return;
+    }
+    
     ref.update({ board: localBoard, turn: nextTurn });
   });
+}
+
+/***************************************
+ * Funzione helper: checkGameOver
+ * Restituisce "red" se il giocatore red ha 0 pezzi,
+ * "panna" se il giocatore panna ha 0 pezzi, altrimenti null.
+ ***************************************/
+function checkGameOver(board) {
+  let countRed = 0;
+  let countPanna = 0;
+  for (let r = 0; r < board.length; r++) {
+    for (let c = 0; c < board[r].length; c++) {
+      const piece = board[r][c];
+      if (piece && piece.startsWith("red")) countRed++;
+      if (piece && piece.startsWith("panna")) countPanna++;
+    }
+  }
+  if (countRed === 0) return "red";
+  if (countPanna === 0) return "panna";
+  return null;
 }
 
 /***********************************
