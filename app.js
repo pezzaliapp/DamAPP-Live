@@ -3,11 +3,11 @@
  ***************************************/
 const forceCapture = true;           // Se true, la cattura è obbligatoria
 const multiCaptureTimeoutMS = 5000;    // Timeout per cattura multipla (5 secondi)
-const testingMode = false;           // Se true, bypassa il controllo turno (per test su un singolo dispositivo)
+const testingMode = false;           // Se true, bypassa il controllo turno (per test in singolo dispositivo)
 
 /***************************************
  * FUNZIONE UTILITY: updateStatus
- * Aggiorna l'elemento "status" della pagina e stampa il messaggio in console.
+ * Aggiorna l'elemento "status" della pagina e logga il messaggio in console.
  ***************************************/
 function updateStatus(message) {
   const statusElem = document.getElementById("status");
@@ -39,7 +39,6 @@ function cloneBoard(board) {
 
 /***************************************
  * Funzione helper: controlla se un giocatore ha mosse legali
- * (Questa funzione è per debug e controllo, ma in questa versione non blocchiamo la partita se un giocatore non ha mosse)
  ***************************************/
 function playerHasMoves(board, color) {
   for (let r = 0; r < board.length; r++) {
@@ -49,17 +48,17 @@ function playerHasMoves(board, color) {
         let simpleDirs = [];
         const isKing = piece.endsWith('K');
         if (isKing) {
-          simpleDirs = [[-1,-1],[-1,1],[1,-1],[1,1]];
+          simpleDirs = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
         } else {
-          simpleDirs = color === 'red' ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]];
+          simpleDirs = color === 'red' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
         }
         for (let [dr, dc] of simpleDirs) {
           let newR = r + dr, newC = c + dc;
-          if (newR >= 0 && newR < 8 && newC >= 0 && newC < 8 && board[newR][newC] === '') {
+          if (newR >= 0 && newR < 8 && newC >= 0 && newC < 8 && board[newR][newC] === '')
             return true;
-          }
         }
-        if (findCapturesForPiece(board, r, c).length > 0) return true;
+        if (findCapturesForPiece(board, r, c).length > 0)
+          return true;
       }
     }
   }
@@ -115,7 +114,8 @@ function listenForUsers() {
     const ul = document.getElementById("user-list");
     snapshot.forEach(child => {
       const user = child.val();
-      if (!user.lastActive || now - user.lastActive > 60000 || user.inGame) return;
+      if (!user.lastActive || now - user.lastActive > 60000 || user.inGame)
+        return;
       const li = document.createElement("li");
       li.textContent = user.name + " 🟢";
       if (user.name !== nickname) {
@@ -192,9 +192,12 @@ function createInitialBoard() {
   for (let r = 0; r < 8; r++) {
     const row = [];
     for (let c = 0; c < 8; c++) {
-      if ((r + c) % 2 === 1 && r < 3) row.push('panna');
-      else if ((r + c) % 2 === 1 && r > 4) row.push('red');
-      else row.push('');
+      if ((r + c) % 2 === 1 && r < 3)
+        row.push('panna');
+      else if ((r + c) % 2 === 1 && r > 4)
+        row.push('red');
+      else
+        row.push('');
     }
     board.push(row);
   }
@@ -209,8 +212,10 @@ function listenToGame(gameId) {
   ref.on('value', snapshot => {
     const data = snapshot.val();
     if (data && data.board) {
-      if (data.players.red === userRef.key) playerColor = 'red';
-      else if (data.players.panna === userRef.key) playerColor = 'panna';
+      if (data.players.red === userRef.key)
+        playerColor = 'red';
+      else if (data.players.panna === userRef.key)
+        playerColor = 'panna';
       console.log(`Assegnato playerColor: ${playerColor} per l'utente ${userRef.key}`);
       renderBoard(data.board, data.turn);
     }
@@ -224,13 +229,16 @@ function renderBoard(board, turn) {
   console.log(`renderBoard: Turno di ${turn}. Io sono ${playerColor}`);
   const container = document.getElementById('board');
   container.innerHTML = '';
-  if (turn) updateStatus(`Turno di ${turn.toUpperCase()}`);
+  if (turn)
+    updateStatus(`Turno di ${turn.toUpperCase()}`);
   
   let rowIndices = [];
   if (playerColor === 'panna') {
-    for (let r = board.length - 1; r >= 0; r--) rowIndices.push(r);
+    for (let r = board.length - 1; r >= 0; r--)
+      rowIndices.push(r);
   } else {
-    for (let r = 0; r < board.length; r++) rowIndices.push(r);
+    for (let r = 0; r < board.length; r++)
+      rowIndices.push(r);
   }
   
   rowIndices.forEach(r => {
@@ -257,14 +265,14 @@ function renderBoard(board, turn) {
 function onSquareClick(board, turn, r, c) {
   console.log(`Cliccato su cella (${r},${c}). Turno: ${turn} – Io: ${playerColor}`);
   
-  // Se non è il tuo turno (solo in modalità multiplayer), mostra il messaggio
+  // Se non è il tuo turno, mostra messaggio e ritorna
   if (!testingMode && turn !== playerColor) {
     console.log("Non è il mio turno");
     updateStatus("Attendi il tuo turno per muovere");
     return;
   }
   
-  // Se clicchi sulla stessa cella già selezionata, deseleziona
+  // Se clicchi la stessa cella già selezionata, deseleziona
   if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
     console.log("Deseleziono la pedina");
     selectedCell = null;
@@ -410,7 +418,7 @@ function findAllCaptures(board, color) {
 function findCapturesForPiece(board, r, c) {
   const piece = board[r][c];
   if (!piece) return [];
-  const directions = [[-2,-2],[-2,2],[2,-2],[2,2]];
+  const directions = [[-2, -2], [-2, 2], [2, -2], [2, 2]];
   const caps = [];
   directions.forEach(([dr, dc]) => {
     const newR = r + dr, newC = c + dc;
@@ -423,11 +431,17 @@ function findCapturesForPiece(board, r, c) {
 }
 
 /****************************************************************
- * 14) isThisMoveACapture: verifica se il movimento da (from) a (to) è una cattura valida
+ * 14) isThisMoveACapture: verifica se il movimento da (from) a (to)
+ * è una cattura valida.
+ * IMPORTANTE: La casella di arrivo DEVE essere vuota.
  ****************************************************************/
 function isThisMoveACapture(board, piece, fromR, fromC, toR, toC) {
-  if (Math.abs(toR - fromR) !== 2 || Math.abs(toC - fromC) !== 2) return false;
-  const midR = fromR + (toR - fromR) / 2, midC = fromC + (toC - fromC) / 2;
+  if (Math.abs(toR - fromR) !== 2 || Math.abs(toC - fromC) !== 2)
+    return false;
+  // Verifica che la casella di destinazione sia vuota
+  if (board[toR][toC] !== '') return false;
+  const midR = fromR + (toR - fromR) / 2;
+  const midC = fromC + (toC - fromC) / 2;
   const enemy = board[midR][midC];
   if (!enemy) return false;
   return !enemy.startsWith(piece.startsWith('red') ? 'red' : 'panna');
