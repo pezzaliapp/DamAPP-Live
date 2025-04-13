@@ -3,7 +3,7 @@
  ***************************************/
 const forceCapture = true;           // Se true, la cattura è obbligatoria
 const multiCaptureTimeoutMS = 5000;    // Timeout per cattura multipla (5 secondi)
-const testingMode = false;           // Se true, bypassa il controllo turno (per test in singolo dispositivo)
+const testingMode = false;           // Se true, bypassa il controllo turno (per test)
 
 /***************************************
  * FUNZIONE UTILITY: updateStatus
@@ -223,7 +223,7 @@ function listenToGame(gameId) {
 }
 
 /**************************************************************
- * 8) renderBoard: disegna la damiera; se sei "panna", inverte l'ordine delle righe
+ * 8) renderBoard: disegna la damiera; se sei "panna" inverte l'ordine delle righe
  **************************************************************/
 function renderBoard(board, turn) {
   console.log(`renderBoard: Turno di ${turn}. Io sono ${playerColor}`);
@@ -265,14 +265,14 @@ function renderBoard(board, turn) {
 function onSquareClick(board, turn, r, c) {
   console.log(`Cliccato su cella (${r},${c}). Turno: ${turn} – Io: ${playerColor}`);
   
-  // Se non è il tuo turno, mostra messaggio e ritorna
+  // Se non è il tuo turno (solo in modalità multiplayer), mostra il messaggio e ritorna
   if (!testingMode && turn !== playerColor) {
     console.log("Non è il mio turno");
     updateStatus("Attendi il tuo turno per muovere");
     return;
   }
   
-  // Se clicchi la stessa cella già selezionata, deseleziona
+  // Se clicchi sulla stessa cella già selezionata, deseleziona
   if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
     console.log("Deseleziono la pedina");
     selectedCell = null;
@@ -339,7 +339,7 @@ function onSquareClick(board, turn, r, c) {
 }
 
 /********************************************************************
- * 10) tryMove: verifica la validità della mossa (passo semplice o cattura)
+ * 10) tryMove: verifica la validità della mossa (passo semplice o cattura) e aggiorna la board
  ********************************************************************/
 function tryMove(board, fromR, fromC, toR, toC) {
   if (board[toR][toC] !== '')
@@ -418,7 +418,7 @@ function findAllCaptures(board, color) {
 function findCapturesForPiece(board, r, c) {
   const piece = board[r][c];
   if (!piece) return [];
-  const directions = [[-2, -2], [-2, 2], [2, -2], [2, 2]];
+  const directions = [[-2,-2],[-2,2],[2,-2],[2,2]];
   const caps = [];
   directions.forEach(([dr, dc]) => {
     const newR = r + dr, newC = c + dc;
@@ -432,19 +432,19 @@ function findCapturesForPiece(board, r, c) {
 
 /****************************************************************
  * 14) isThisMoveACapture: verifica se il movimento da (from) a (to)
- * è una cattura valida.
- * IMPORTANTE: La casella di arrivo DEVE essere vuota.
+ * è una cattura valida. 
+ * IMPORTANTE: viene verificato che la casella di destinazione sia vuota.
  ****************************************************************/
 function isThisMoveACapture(board, piece, fromR, fromC, toR, toC) {
-  if (Math.abs(toR - fromR) !== 2 || Math.abs(toC - fromC) !== 2)
-    return false;
-  // Verifica che la casella di destinazione sia vuota
+  if (Math.abs(toR - fromR) !== 2 || Math.abs(toC - fromC) !== 2) return false;
+  // Controlla che la casella di destinazione sia vuota
   if (board[toR][toC] !== '') return false;
-  const midR = fromR + (toR - fromR) / 2;
-  const midC = fromC + (toC - fromC) / 2;
+  const midR = (fromR + toR) / 2;
+  const midC = (fromC + toC) / 2;
   const enemy = board[midR][midC];
   if (!enemy) return false;
-  return !enemy.startsWith(piece.startsWith('red') ? 'red' : 'panna');
+  if (enemy.startsWith(piece.startsWith('red') ? 'red' : 'panna')) return false;
+  return true;
 }
 
 /****************************************************************
